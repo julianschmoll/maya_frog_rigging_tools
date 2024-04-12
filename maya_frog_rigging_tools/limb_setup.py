@@ -4,6 +4,8 @@ import re
 
 from pymel.core.nodetypes import DependNode
 
+from maya_frog_rigging_tools import control
+
 BND_PATTERN = "_bnd"
 LOGGER = logging.getLogger("Rigging Utils")
 
@@ -43,16 +45,16 @@ class LimbSetup:
     def _create_ctl_guides(self):
         self.log.info("Creating Controls")
         guides_grp = pm.group(em=True, name=f"{self.prefix}_guides")
-        self.guide_dict = {
-            "host": None,
-            "fk_1_ctl": self.fk_chain[0],
-            "fk_2_ctl": self.fk_chain[2],
-            "fk_3_ctl": self.fk_chain[1],
-            "pole_ctl": self.ik_chain[2],
-            "root_ctl": self.root,
-            "ik_ctl": self.ik_chain[1]
+        self.guide_mapping = {
+            "host_guide": None,
+            "fk_1_guide": self.fk_chain[0],
+            "fk_2_guide": self.fk_chain[2],
+            "fk_3_guide": self.fk_chain[1],
+            "pole_guide": self.ik_chain[2],
+            "root_guide": self.root,
+            "ik_guide": self.ik_chain[1]
         }
-        for guide_name, joint in self.guide_dict.items():
+        for guide_name, joint in self.guide_mapping.items():
             guide = pm.createNode("locator", name=f"{self.prefix}_{guide_name}Shape")
             guides_grp.addChild(f"{self.prefix}_{guide_name}")
             if joint is not None:
@@ -61,6 +63,24 @@ class LimbSetup:
 
     def _create_ctl_from_guides(self):
         self.log.info("Creating Controls from Guides")
+        self.ctl_mapping = {
+            "host_guide": "gear",
+            "fk_1_guide": "circle",
+            "fk_2_guide": "circle",
+            "fk_3_guide": "circle",
+            "pole_guide": self.ik_chain[2],
+            "root_guide": self.root,
+            "ik_guide": self.ik_chain[1]
+        }
+        for guide in self.guide_mapping.keys():
+            guide_node = pm.PyNode(f"{self.prefix}_{guide}")
+            clean_name = guide.removesuffix("_guide")
+            ctl = control.create(
+                self.ctl_mapping.get(guide),
+                name=f"{self.prefix}_{clean_name}_ctl",
+                size=guide_node.scaleX.get()
+            )
+            pm.matchTransform(guide_node, ctl)
 
     def _constrain_fk_ik(self):
         self.log.info("Constraining IK FK Structure")
@@ -96,15 +116,3 @@ def duplicate_and_rename_hierarchy(root_joint, old_name_pattern, new_name_patter
         renamed_list.append(node.rename(new_name))
 
     return renamed_list
-
-
-def create_circle_ctl():
-
-
-def create_host_ctl():
-
-
-def create_cube_ctl():
-
-
-def create_sphere_ctl():
