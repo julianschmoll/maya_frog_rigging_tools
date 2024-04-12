@@ -12,14 +12,13 @@ class CreateUI():
         if cmds.window(windowID, exists=True):
             cmds.deleteUI(windowID)
 
-        masterWindow = cmds.window(windowID, title="Deform Cage", w=390, h=225, sizeable=False, resizeToFitChildren=False)
-        cmds.rowColumnLayout(parent=masterWindow, numberOfColumns=1)       
+        master_window = cmds.window(
+            windowID, title="Deform Cage", w=390, h=225, sizeable=False, resizeToFitChildren=False
+        )
+        cmds.rowColumnLayout(parent=master_window, numberOfColumns=1)
       
         def apply_close(*args):
-            try:
-                apply()
-            except:
-                om2.MGlobal.displayError("Failed to create Deform Cage")
+            apply()
             close()
 
         def apply(*args):
@@ -49,8 +48,12 @@ class CreateUI():
         cmds.setParent("..")
         cmds.separator(h=20, style="none")
         
-        self.ctl_size = cmds.intSliderGrp("ctl_size",label="Control Size: ", field=True, min=1, max=100, value=2, width=350)  
-        self.smooth_iter = cmds.intSliderGrp("smooth_iter",label="Smoothing Iterations ", field=True, min=1, max=10, value=2, width=350)
+        self.ctl_size = cmds.intSliderGrp(
+            "ctl_size", label="Control Size: ", field=True, min=1, max=100, value=2, width=350
+        )
+        self.smooth_iter = cmds.intSliderGrp(
+            "smooth_iter", label="Smoothing Iterations ", field=True, min=1, max=10, value=2, width=350
+        )
         cmds.separator(h=20, style="none")
          
         cmds.columnLayout()
@@ -70,6 +73,6 @@ class CreateUI():
 
         cmds.showWindow(windowID)
 
+
 def show():
-    ui=CreateUI()   
-    
+    CreateUI()

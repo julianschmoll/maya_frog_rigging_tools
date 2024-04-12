@@ -4,7 +4,7 @@ import logging
 import pymel.core as pm
 
 
-logger = logging.getLogger("maya_frog_rigging_tools.deformation_cage")
+logger = logging.getLogger("Deformation Cage")
 
 
 def create_deform_cage(mesh_name, t_pose_objs, ctl_size=1, smooth_iterations=2):
