@@ -1,16 +1,32 @@
-from maya import cmds
+from pymel import core as pm
 import json
 from maya import OpenMaya as om
 
 
-def create_ctl_from_json(file_path):
+def create_ctl_from_json(file_path, name, ctl_size=1):
     with open(file_path, "r") as f:
         shape_data = json.load(f)
 
+    shape_list = []
+
     for shape in shape_data:
-        new_curve = cmds.curve(degree=3, point=shape["points"])
-        cmds.closeCurve(new_curve, ch=False, ps=False, rpo=True)
-        cmds.rename(new_curve, shape["name"])
+        new_curve = pm.curve(degree=3, point=shape["points"])
+        pm.closeCurve(new_curve, ch=False, ps=False, rpo=True)
+        shape_list.append(pm.rename(new_curve, shape["name"]))
+
+    ctl = shape_list.pop(0)
+
+    for shape in shape_list:
+        shapes = pm.listRelatives(shape, shapes=True, fullPath=True)
+        pm.parent(shapes, ctl, add=True, shape=True)
+        pm.delete(shape)
+
+    pm.scale(ctl, ctl_size, ctl_size, ctl_size)
+    pm.makeIdentity(ctl, apply=True, t=1, r=1, s=1, n=0)
+    pm.xform(ctl, zeroTransformPivots=True)
+    pm.rename(ctl, name, ignoreShape=True)
+
+    return ctl
 
 
 def write_json_from_dag(out_path):
@@ -30,6 +46,5 @@ def write_json_from_dag(out_path):
 
         output.append(node)
 
-    # Save as a json file (or switch this up to use another format)
     with open(out_path, mode="w") as output_file:
         json.dump(output, output_file)
