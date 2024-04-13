@@ -25,7 +25,7 @@ class LimbSetup:
     def build_ctl_rig(self):
         self.log.info("Building Control Structure")
         self._create_ctl_from_guides()
-        self._connect_fk_chain()
+        self._build_fk_chain()
         self._constrain_fk_ik()
         self._create_ik_handle()
         self._setup_stretch()
@@ -85,13 +85,85 @@ class LimbSetup:
             pm.matchTransform(null_grp, guide_node)
             self.ctl_data[ctl_name] = {
                 "node": ctl,
+                "joint": guide_info.get("joint"),
                 "subcomponent": clean_name.split("_")[0],
                 "srt": srt_grp,
                 "null": null_grp
             }
 
-    def _connect_fk_chain(self):
-        self.log.info("Connecting FK Chain")
+    def _build_fk_chain(self):
+        self.log.info("Building FK Chain")
+        fk_subcomponents = {key: value for key, value in self.ctl_data.items() if value['subcomponent'] == 'fk'}
+        ordered_chain = dict(sorted(fk_subcomponents.items(), key=lambda x: int(x[0].split('_')[-2])))
+        previous_chain_element_value = None
+
+        for next_chain_element_key, next_chain_element_value in ordered_chain.items():
+            next_ctl = next_chain_element_value.get("node")
+            next_jnt = next_chain_element_value.get("joint")
+
+            if previous_chain_element_value:
+                prev_ctl = previous_chain_element_value.get("node")
+                next_srt = next_chain_element_value.get("srt")
+
+                self.log.info(f"Constraining {next_srt} to {prev_ctl}")
+                translate_constraint = pm.parentConstraint(
+                    prev_ctl,
+                    next_srt,
+                    mo=True,
+                    skipRotate=['x', 'y', 'z'],
+                    weight=1,
+                    name=f"{prev_ctl}_{next_srt}_trl_constr"
+                )
+                rotate_constraint = pm.parentConstraint(
+                    prev_ctl,
+                    next_srt,
+                    mo=True,
+                    skipTranslate=['x', 'y', 'z'],
+                    weight=1,
+                    name=f"{prev_ctl}_{next_srt}_rot_constr"
+                )
+
+                self.log.debug(f"Add Space switching attributes on {next_ctl}")
+                pm.addAttr(
+                    next_ctl,
+                    longName="FollowTranslation",
+                    attributeType='float',
+                    minValue=0,
+                    maxValue=1,
+                    defaultValue=1,
+                    keyable=True
+                )
+                pm.addAttr(
+                    next_ctl,
+                    longName="FollowRotation",
+                    attributeType='float',
+                    minValue=0,
+                    maxValue=1,
+                    defaultValue=1,
+                    keyable=True
+                )
+
+                pm.connectAttr(
+                    f"{next_ctl}.FollowTranslation",
+                    translate_constraint.attr('w0'),
+                    force=True
+                )
+                pm.connectAttr(
+                    f"{next_ctl}.FollowRotation",
+                    rotate_constraint.attr('w0'),
+                    force=True
+                )
+
+            self.log.info("Constraining {next_jnt} to {next_ctl}")
+            pm.parentConstraint(
+                next_ctl,
+                next_jnt,
+                mo=True,
+                weight=1,
+                name=f"{next_ctl}_{next_jnt}_jnt_constr"
+            )
+
+            previous_chain_element_value = next_chain_element_value
 
     def _constrain_fk_ik(self):
         self.log.info("Constraining IK FK Structure")
