@@ -17,7 +17,7 @@ class LimbSetup:
         self.root = root_bnd
         self.prefix = prefix_name
 
-    def build_joint_structure(self):
+    def build_structure(self):
         self.log.info("Building Joint Structure")
         self._create_joint_structure()
         self._create_ctl_guides()
@@ -25,6 +25,7 @@ class LimbSetup:
     def build_ctl_rig(self):
         self.log.info("Building Control Structure")
         self._create_ctl_from_guides()
+        self._connect_fk_chain()
         self._constrain_fk_ik()
         self._create_ik_handle()
         self._setup_stretch()
@@ -50,15 +51,16 @@ class LimbSetup:
         self.log.info("Creating Controls")
         guides_grp = pm.group(em=True, name=f"{self.prefix}_guides")
         self.guide_mapping = {
-            "host_guide": None,
-            "fk_1_guide": self.fk_chain[0],
-            "fk_2_guide": self.fk_chain[2],
-            "fk_3_guide": self.fk_chain[1],
-            "pole_guide": self.ik_chain[2],
-            "root_guide": self.root,
-            "ik_guide": self.ik_chain[1]
+            "host_guide": {"ctl_shape": "gear"},
+            "fk_1_guide": {"joint": self.fk_chain[0], "ctl_shape": "circle"},
+            "fk_2_guide": {"joint": self.fk_chain[2], "ctl_shape": "circle"},
+            "fk_3_guide": {"joint": self.fk_chain[1], "ctl_shape": "circle"},
+            "pole_guide": {"joint": self.ik_chain[2], "ctl_shape": "sphere"},
+            "root_guide": {"joint": self.root, "ctl_shape": "needle"},
+            "ik_guide": {"joint": self.ik_chain[1], "ctl_shape": "box"}
         }
-        for guide_name, joint in self.guide_mapping.items():
+        for guide_name, guide_info in self.guide_mapping.items():
+            joint = guide_info.get("joint")
             guide = pm.createNode("locator", name=f"{self.prefix}_{guide_name}Shape")
             guides_grp.addChild(f"{self.prefix}_{guide_name}")
             if joint is not None:
@@ -67,24 +69,29 @@ class LimbSetup:
 
     def _create_ctl_from_guides(self):
         self.log.info("Creating Controls from Guides")
-        self.ctl_mapping = {
-            "host_guide": "gear",
-            "fk_1_guide": "circle",
-            "fk_2_guide": "circle",
-            "fk_3_guide": "circle",
-            "pole_guide": "sphere",
-            "root_guide": "needle",
-            "ik_guide": "box"
-        }
-        for guide in self.guide_mapping.keys():
+        self.ctl_data = {}
+        controls_grp = pm.group(em=True, name=f"{self.prefix}_ctl")
+        for guide, guide_info in self.guide_mapping.items():
             guide_node = pm.PyNode(f"{self.prefix}_{guide}")
             clean_name = guide.removesuffix("_guide")
+            ctl_name = f"{self.prefix}_{clean_name}_ctl"
             ctl = control.create(
-                self.ctl_mapping.get(guide),
-                name=f"{self.prefix}_{clean_name}_ctl",
-                size=guide_node.scaleX.get()
+                guide_info.get("ctl_shape"),
+                name=ctl_name,
             )
-            pm.matchTransform(guide_node, ctl)
+            srt_grp = pm.group(ctl, name=f"{ctl_name}_srt")
+            null_grp = pm.group(srt_grp,  name=f"{ctl_name}_null")
+            controls_grp.addChild(null_grp)
+            pm.matchTransform(null_grp, guide_node)
+            self.ctl_data[ctl_name] = {
+                "node": ctl,
+                "subcomponent": clean_name.split("_")[0],
+                "srt": srt_grp,
+                "null": null_grp
+            }
+
+    def _connect_fk_chain(self):
+        self.log.info("Connecting FK Chain")
 
     def _constrain_fk_ik(self):
         self.log.info("Constraining IK FK Structure")
