@@ -154,7 +154,7 @@ class LimbSetup:
                     force=True
                 )
 
-            self.log.info("Constraining {next_jnt} to {next_ctl}")
+            self.log.info(f"Constraining {next_jnt} to {next_ctl}")
             pm.parentConstraint(
                 next_ctl,
                 next_jnt,
@@ -167,17 +167,74 @@ class LimbSetup:
 
     def _constrain_fk_ik(self):
         self.log.info("Constraining IK FK Structure")
+
+        host_component = next((value for value in self.ctl_data.values() if value['subcomponent'] == 'host'), None)
+        host_node = host_component.get("node")
+        pm.addAttr(
+            host_node,
+            longName="IkFkSwitch",
+            attributeType='float',
+            minValue=0,
+            maxValue=1,
+            defaultValue=1,
+            keyable=True
+        )
+        fk_ik_reverse = pm.createNode("reverse", name=f"{self.prefix}_fk_ik_reverse")
+        pm.connectAttr(
+            host_node.attr("IkFkSwitch"),
+            fk_ik_reverse.attr('inputX'),
+            force=True
+        )
+
         for index, constrained in enumerate(self.root_chain):
-            pm.parentConstraint(
+            joint_constraint = pm.parentConstraint(
                 self.fk_chain[index],
                 self.ik_chain[index],
                 constrained,
-                maintainOffset=True
+                maintainOffset=True,
+                name=f"{self.fk_chain[index]}{self.ik_chain[index]}{constrained}_constr"
             )
-            # add node connection to parent constraint (ik and reverse fk)
+
+            self.log.debug(f"Add IK FK Switch Attribute for {joint_constraint}")
+            pm.connectAttr(
+                host_node.attr("IkFkSwitch"),
+                joint_constraint.attr('w0'),
+                force=True
+            )
+            pm.connectAttr(
+                fk_ik_reverse.attr('outputX'),
+                joint_constraint.attr('w1'),
+                force=True
+            )
+
+        self.log.info("Setting up IK FK visibility")
+        for ctl, control_data in self.ctl_data.items():
+            if control_data.get("subcomponent") == "fk":
+                pm.connectAttr(
+                    host_node.attr("IkFkSwitch"),
+                    control_data.get("node").attr('visibility'),
+                    force=True
+                )
+            elif control_data.get("subcomponent") in ["ik", "pole"]:
+                pm.connectAttr(
+                    fk_ik_reverse.attr('outputX'),
+                    control_data.get("node").attr('visibility'),
+                    force=True
+                )
 
     def _create_ik_handle(self):
-        self.log.info("Created IK Handle")
+        self.log.info("Creating IK Handle")
+        root_component = next((value for value in self.ctl_data.values() if value['subcomponent'] == 'root'), None)
+        pole_component = next((value for value in self.ctl_data.values() if value['subcomponent'] == 'pole'), None)
+        ik_component = next((value for value in self.ctl_data.values() if value['subcomponent'] == 'ik'), None)
+        ik_handle = pm.ikHandle(
+            name=f"{root_component['joint']}_to_{ik_component['joint']}_hndl",
+            sj=self.ik_chain[0],
+            ee=ik_component['joint'],
+            sol='ikRPsolver'
+        )[0]
+        pm.parentConstraint(ik_component['node'], ik_handle)
+        pm.poleVectorConstraint(pole_component['node'], ik_handle)
 
     def _setup_stretch(self):
         self.log.info("Making Limb Stretchy")
@@ -199,22 +256,3 @@ def duplicate_and_rename_hierarchy(root_joint, old_name_pattern, new_name_patter
         renamed_list.append(node.rename(new_name))
 
     return renamed_list
-
-
-"""
-Use like this:
-import sys
-import importlib
-
-sys.path.append("maya_frog_rigging_tools")
-from maya_frog_rigging_tools import limb_setup
-
-importlib.reload(maya_frog_rigging_tools)
-importlib.reload(limb_setup)
-
-root = pm.PyNode("shoulder_r_bnd")
-limb_setup = limb_setup.LimbSetup(root, "arm_r")
-limb_setup.build_joint_structure()
-# Then place locators
-limb_setup.build_ctl_rig()
-"""
