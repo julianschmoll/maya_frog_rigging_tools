@@ -4,7 +4,7 @@ import re
 
 from pymel.core.nodetypes import DependNode
 
-from maya_frog_rigging_tools import control
+from . import control
 
 BND_PATTERN = "_bnd"
 LOGGER = logging.getLogger("Rigging Utils")
@@ -32,6 +32,10 @@ class LimbSetup:
     def _create_joint_structure(self):
         self.log.info("Duplicating Joint Chain")
         self.root_chain = [self.root] + self.root.listRelatives(allDescendents=True)
+        if not len(self.root_chain) > 2:
+            raise RuntimeError(
+                "Can't Setup Limb, please input chain with at least 2 elements!"
+            )
         self.fk_chain = duplicate_and_rename_hierarchy(
             self.root, BND_PATTERN, "_fk"
         )
@@ -68,9 +72,9 @@ class LimbSetup:
             "fk_1_guide": "circle",
             "fk_2_guide": "circle",
             "fk_3_guide": "circle",
-            "pole_guide": self.ik_chain[2],
-            "root_guide": self.root,
-            "ik_guide": self.ik_chain[1]
+            "pole_guide": "sphere",
+            "root_guide": "needle",
+            "ik_guide": "box"
         }
         for guide in self.guide_mapping.keys():
             guide_node = pm.PyNode(f"{self.prefix}_{guide}")
@@ -116,3 +120,22 @@ def duplicate_and_rename_hierarchy(root_joint, old_name_pattern, new_name_patter
         renamed_list.append(node.rename(new_name))
 
     return renamed_list
+
+
+"""
+Use like this:
+import sys
+import importlib
+
+sys.path.append("maya_frog_rigging_tools")
+from maya_frog_rigging_tools import limb_setup
+
+importlib.reload(maya_frog_rigging_tools)
+importlib.reload(limb_setup)
+
+root = pm.PyNode("shoulder_r_bnd")
+limb_setup = limb_setup.LimbSetup(root, "arm_r")
+limb_setup.build_joint_structure()
+# Then place locators
+limb_setup.build_ctl_rig()
+"""
