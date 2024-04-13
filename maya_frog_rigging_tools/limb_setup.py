@@ -11,10 +11,13 @@ LOGGER = logging.getLogger("Rigging Utils")
 
 
 class LimbSetup:
-    def __init__(self, root_bnd, prefix_name="limb", primary_axis="X"):
+    def __init__(self, root_bnd, prefix_name="limb", primary_axis="X", secondary_axis="Y", up_axis="Z", ctl_scale=1):
         self.log = logging.getLogger("Limb Setup")
         self.log.info("Initializing LimbSetup")
         self.primary_axis = primary_axis
+        self.secondary_axis = secondary_axis
+        self.up_axis = up_axis
+        self.ctl_scale = ctl_scale
         self.root = root_bnd
         self.prefix = prefix_name
 
@@ -47,10 +50,11 @@ class LimbSetup:
         self.stretch_chain = duplicate_and_rename_hierarchy(
             self.root, BND_PATTERN, "_stretch"
         )
+        self.jnt_grp = pm.group(self.fk_chain[0], self.ik_chain[0], self.stretch_chain[0], name=f"{self.prefix}")
 
     def _create_ctl_guides(self):
         self.log.info("Creating Controls")
-        guides_grp = pm.group(em=True, name=f"{self.prefix}_guides")
+        self.guides_grp = pm.group(em=True, name=f"{self.prefix}_guides")
         self.guide_mapping = {
             "host_guide": {"ctl_shape": "gear"},
             "fk_1_guide": {"joint": self.fk_chain[0], "ctl_shape": "circle"},
@@ -63,7 +67,7 @@ class LimbSetup:
         for guide_name, guide_info in self.guide_mapping.items():
             joint = guide_info.get("joint")
             guide = pm.createNode("locator", name=f"{self.prefix}_{guide_name}Shape")
-            guides_grp.addChild(f"{self.prefix}_{guide_name}")
+            self.guides_grp.addChild(f"{self.prefix}_{guide_name}")
             if joint is not None:
                 pm.matchTransform(guide, joint)
             self.log.info(f"Created {guide}")
@@ -95,65 +99,65 @@ class LimbSetup:
     def _build_fk_chain(self):
         self.log.info("Building FK Chain")
         fk_subcomponents = {key: value for key, value in self.ctl_data.items() if value['subcomponent'] == 'fk'}
+        root_components = {key: value for key, value in self.ctl_data.items() if value['subcomponent'] == 'root'}
         ordered_chain = dict(sorted(fk_subcomponents.items(), key=lambda x: int(x[0].split('_')[-2])))
-        previous_chain_element_value = None
+        previous_chain_element_key, previous_chain_element_value = next(iter(root_components.items()))
 
         for next_chain_element_key, next_chain_element_value in ordered_chain.items():
             next_ctl = next_chain_element_value.get("node")
             next_jnt = next_chain_element_value.get("joint")
 
-            if previous_chain_element_value:
-                prev_ctl = previous_chain_element_value.get("node")
-                next_srt = next_chain_element_value.get("srt")
+            prev_ctl = previous_chain_element_value.get("node")
+            next_srt = next_chain_element_value.get("srt")
 
-                self.log.info(f"Constraining {next_srt} to {prev_ctl}")
-                translate_constraint = pm.parentConstraint(
-                    prev_ctl,
-                    next_srt,
-                    mo=True,
-                    skipRotate=['x', 'y', 'z'],
-                    weight=1,
-                    name=f"{prev_ctl}_{next_srt}_trl_constr"
-                )
-                rotate_constraint = pm.parentConstraint(
-                    prev_ctl,
-                    next_srt,
-                    mo=True,
-                    skipTranslate=['x', 'y', 'z'],
-                    weight=1,
-                    name=f"{prev_ctl}_{next_srt}_rot_constr"
-                )
+            self.log.info(f"Constraining {next_srt} to {prev_ctl}")
+            translate_constraint = pm.parentConstraint(
+                prev_ctl,
+                next_srt,
+                mo=True,
+                skipRotate=['x', 'y', 'z'],
+                weight=1,
+                name=f"{prev_ctl}_{next_srt}_trl_constr"
+            )
+            rotate_constraint = pm.parentConstraint(
+                prev_ctl,
+                next_srt,
+                mo=True,
+                skipTranslate=['x', 'y', 'z'],
+                weight=1,
+                name=f"{prev_ctl}_{next_srt}_rot_constr"
+            )
 
-                self.log.debug(f"Add Space switching attributes on {next_ctl}")
-                pm.addAttr(
-                    next_ctl,
-                    longName="FollowTranslation",
-                    attributeType='float',
-                    minValue=0,
-                    maxValue=1,
-                    defaultValue=1,
-                    keyable=True
-                )
-                pm.addAttr(
-                    next_ctl,
-                    longName="FollowRotation",
-                    attributeType='float',
-                    minValue=0,
-                    maxValue=1,
-                    defaultValue=1,
-                    keyable=True
-                )
+            self.log.debug(f"Add Space switching attributes on {next_ctl}")
+            pm.addAttr(
+                next_ctl,
+                longName="FollowTranslation",
+                attributeType='float',
+                minValue=0,
+                maxValue=1,
+                defaultValue=1,
+                keyable=True
+            )
+            pm.addAttr(
+                next_ctl,
+                longName="FollowRotation",
+                attributeType='float',
+                minValue=0,
+                maxValue=1,
+                defaultValue=1,
+                keyable=True
+            )
 
-                pm.connectAttr(
-                    f"{next_ctl}.FollowTranslation",
-                    translate_constraint.attr('w0'),
-                    force=True
-                )
-                pm.connectAttr(
-                    f"{next_ctl}.FollowRotation",
-                    rotate_constraint.attr('w0'),
-                    force=True
-                )
+            pm.connectAttr(
+                f"{next_ctl}.FollowTranslation",
+                translate_constraint.attr('w0'),
+                force=True
+            )
+            pm.connectAttr(
+                f"{next_ctl}.FollowRotation",
+                rotate_constraint.attr('w0'),
+                force=True
+            )
 
             self.log.info(f"Constraining {next_jnt} to {next_ctl}")
             pm.parentConstraint(
@@ -171,6 +175,9 @@ class LimbSetup:
 
         host_component = next((value for value in self.ctl_data.values() if value['subcomponent'] == 'host'), None)
         host_node = host_component.get("node")
+
+        pm.pointConstraint(self.root_chain[2], host_node, mo=True)
+
         pm.addAttr(
             host_node,
             longName="IkFkSwitch",
@@ -234,8 +241,14 @@ class LimbSetup:
             ee=ik_component['joint'],
             sol='ikRPsolver'
         )[0]
+
+        pm.setAttr(f"{ik_handle}.visibility", 0)
+
         pm.parentConstraint(ik_component['node'], ik_handle)
         pm.poleVectorConstraint(pole_component['node'], ik_handle)
+
+        root_ctl = root_component.get("node")
+        pm.pointConstraint(root_ctl, self.jnt_grp, mo=True)
 
     def _setup_stretch(self):
         self.log.info("Making Limb Stretchy")
@@ -256,7 +269,7 @@ class LimbSetup:
         pm.connectAttr(f"{chain_middle}.worldMatrix[0]", f"{dist_2}.inMatrix1", force=True)
         pm.connectAttr(f"{chain_end}.worldMatrix[0]", f"{dist_2}.inMatrix2", force=True)
 
-        base_length = pm.createNode("addDoubleLinear", name=f"{setup.prefix}_length")
+        base_length = pm.createNode("addDoubleLinear", name=f"{self.prefix}_length")
         pm.connectAttr(f"{dist_1}.distance", f"{base_length}.input1")
         pm.connectAttr(f"{dist_2}.distance", f"{base_length}.input2")
 
@@ -283,7 +296,7 @@ class LimbSetup:
             host_node,
             longName="maxStretch",
             attributeType='float',
-            minValue=0,
+            minValue=1,
             maxValue=10,
             defaultValue=1.5,
             keyable=True
@@ -323,6 +336,12 @@ class LimbSetup:
         pm.connectAttr(
             f"{max_stretch_condition}.outColor.outColorR", f"{ik_middle}.scale.scale{self.primary_axis}", force=True
         )
+
+        pm.setAttr(f"{loc_name}.visibility", 0)
+
+    def cleanup(self):
+        self.log.info("Cleaning Up Setup")
+        pm.delete(self.guides_grp)
 
 
 def duplicate_and_rename_hierarchy(root_joint, old_name_pattern, new_name_pattern):
