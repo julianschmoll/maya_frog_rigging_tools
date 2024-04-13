@@ -11,9 +11,10 @@ LOGGER = logging.getLogger("Rigging Utils")
 
 
 class LimbSetup:
-    def __init__(self, root_bnd, prefix_name="limb"):
+    def __init__(self, root_bnd, prefix_name="limb", primary_axis="X"):
         self.log = logging.getLogger("Limb Setup")
         self.log.info("Initializing LimbSetup")
+        self.primary_axis = primary_axis
         self.root = root_bnd
         self.prefix = prefix_name
 
@@ -238,6 +239,90 @@ class LimbSetup:
 
     def _setup_stretch(self):
         self.log.info("Making Limb Stretchy")
+        ik_component = next((value for value in self.ctl_data.values() if value['subcomponent'] == 'ik'), None)
+        host_component = next((value for value in self.ctl_data.values() if value['subcomponent'] == 'host'), None)
+
+        chain_start = self.stretch_chain[0]
+        ik_start = self.ik_chain[0]
+        chain_middle = self.stretch_chain[2]
+        ik_middle = self.ik_chain[2]
+        chain_end = self.stretch_chain[1]
+
+        dist_1 = pm.createNode("distanceBetween", name=f"{chain_start}_{chain_middle}_dist")
+        dist_2 = pm.createNode("distanceBetween", name=f"{chain_middle}_{chain_end}_dist")
+
+        pm.connectAttr(f"{chain_start}.worldMatrix[0]", f"{dist_1}.inMatrix1", force=True)
+        pm.connectAttr(f"{chain_middle}.worldMatrix[0]", f"{dist_1}.inMatrix2", force=True)
+        pm.connectAttr(f"{chain_middle}.worldMatrix[0]", f"{dist_2}.inMatrix1", force=True)
+        pm.connectAttr(f"{chain_end}.worldMatrix[0]", f"{dist_2}.inMatrix2", force=True)
+
+        base_length = pm.createNode("addDoubleLinear", name=f"{setup.prefix}_length")
+        pm.connectAttr(f"{dist_1}.distance", f"{base_length}.input1")
+        pm.connectAttr(f"{dist_2}.distance", f"{base_length}.input2")
+
+        loc_name = f"{self.prefix}_end"
+        pm.createNode("locator", name=f"{loc_name}Shape")
+        pm.matchTransform(loc_name, ik_component.get("node"))
+        pm.parent(loc_name, ik_component.get("node"))
+        stretch_length = pm.createNode("distanceBetween", name=f"{chain_start}_{loc_name}_dist")
+        pm.connectAttr(f"{chain_start}.worldMatrix[0]", f"{stretch_length}.inMatrix1", force=True)
+        pm.connectAttr(f"{loc_name}.worldMatrix[0]", f"{stretch_length}.inMatrix2", force=True)
+
+        condition = pm.createNode("condition", name=f"{self.prefix}_stretch_cond")
+        pm.setAttr(f"{condition}.operation", 2)
+        pm.connectAttr(f"{stretch_length}.distance", f"{condition}.firstTerm", force=True)
+
+        calc_scale = pm.createNode("multiplyDivide", name=f"{self.prefix}_stretch_scale")
+        pm.setAttr(f"{calc_scale}.operation", 2)
+        pm.connectAttr(f"{base_length}.output", f"{calc_scale}.input2.input2X", force=True)
+        pm.connectAttr(f"{stretch_length}.distance", f"{calc_scale}.input1.input1X", force=True)
+        pm.connectAttr(f"{calc_scale}.output.outputX", f"{condition}.colorIfTrue.colorIfTrueR", force=True)
+
+        host_node = host_component.get("node")
+        pm.addAttr(
+            host_node,
+            longName="maxStretch",
+            attributeType='float',
+            minValue=0,
+            maxValue=10,
+            defaultValue=1.5,
+            keyable=True
+        )
+        pm.addAttr(
+            host_node,
+            longName="maxSquash",
+            attributeType='float',
+            minValue=0,
+            maxValue=1,
+            defaultValue=0,
+            keyable=True
+        )
+        squash_reverse = pm.createNode("reverse", name=f"{self.prefix}_squash_reverse")
+        pm.connectAttr(f"{host_node}.maxSquash", squash_reverse.attr('inputX'), force=True)
+
+        max_stretch_condition = pm.createNode("condition", name=f"{self.prefix}_max_stretch_cond")
+
+        pm.setAttr(f"{max_stretch_condition}.operation", 2)
+        pm.connectAttr(
+            f"{condition}.outColor.outColorR", f"{max_stretch_condition}.colorIfTrue.colorIfTrueR", force=True
+        )
+        pm.connectAttr(f"{host_node}.maxStretch", f"{max_stretch_condition}.colorIfFalse.colorIfFalseR", force=True)
+
+        pm.connectAttr(f"{condition}.outColor.outColorR", f"{max_stretch_condition}.secondTerm", force=True)
+        pm.connectAttr(f"{host_node}.maxStretch", f"{max_stretch_condition}.firstTerm", force=True)
+
+        calc_squash_scale = pm.createNode("multiplyDivide", name=f"{self.prefix}_squash_scale")
+        pm.connectAttr(f"{squash_reverse}.output.outputX", f"{calc_squash_scale}.input1.input1X", force=True)
+        pm.connectAttr(f"{squash_reverse}.output.outputX", f"{condition}.colorIfFalse.colorIfFalseR", force=True)
+        pm.connectAttr(f"{base_length}.output", f"{calc_squash_scale}.input2.input2X", force=True)
+        pm.connectAttr(f"{calc_squash_scale}.output.outputX", f"{condition}.secondTerm", force=True)
+
+        pm.connectAttr(
+            f"{max_stretch_condition}.outColor.outColorR", f"{ik_start}.scale.scale{self.primary_axis}", force=True
+        )
+        pm.connectAttr(
+            f"{max_stretch_condition}.outColor.outColorR", f"{ik_middle}.scale.scale{self.primary_axis}", force=True
+        )
 
 
 def duplicate_and_rename_hierarchy(root_joint, old_name_pattern, new_name_pattern):
