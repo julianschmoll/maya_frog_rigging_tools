@@ -4,7 +4,8 @@ import re
 
 from pymel.core.nodetypes import DependNode
 
-from . import control
+from maya_frog_rigging_tools import control
+from maya_frog_rigging_tools.skin import ribbon
 
 BND_PATTERN = "_bnd"
 LOGGER = logging.getLogger("Rigging Utils")
@@ -339,6 +340,45 @@ class LimbSetup:
 
         pm.setAttr(f"{loc_name}.visibility", 0)
 
+    def _setup_ribbon(self):
+        self.log.info("Setting up Ribbon")
+        sorted_chain = get_child_joints_in_order(self.root_chain[0])
+        chain_length = distance_between(sorted_chain[0], sorted_chain[-1])
+        self.log.info(f"Chain Length of {self.root_chain} is {chain_length}")
+        base_ribbon = create_nurbs_plane(chain_length, 8, 1, name=f"{self.prefix}_base_ribbon")
+        match_transforms(sorted_chain[1], base_ribbon, skipRotate=['x', 'y', 'z'])
+        pin_list = ribbon.add_pins_to_ribbon(base_ribbon, 9)
+
+        ctl_offset_grp_list = []
+
+        for index, pin in enumerate(pin_list):
+            jnt = pm.createNode("joint", name=f"{self.prefix}_ribbon_{index}_bnd")
+            match_transforms(sorted_chain[0], jnt)
+            pm.makeIdentity(jnt, apply=True, t=0, r=1, s=0, n=0, pn=True)
+            pm.parent(jnt, pin)
+            pm.xform(jnt, translation=(0, 0, 0))
+
+            if index % 2 == 0:
+                dupl_jnt = pm.duplicate(jnt)[0]
+                dupl_jnt.rename(f"{self.prefix}_ribbon_{index}_ctl")
+                dupl_jnt.setParent(None)
+                grp = pm.createNode("transform", name=f"{self.prefix}_ribbon_{index}_offset")
+                match_transforms(pin, grp)
+
+                ctl_offset_grp_list.append(grp)
+
+                if pin == pin_list[0] or pin == pin_list[-1]:
+                    aim_grp = pm.createNode("transform", name=f"{self.prefix}_ribbon_{index}_aim")
+                    pm.parent(aim_grp, grp)
+                    grp = aim_grp
+
+                pm.parent(dupl_jnt, grp)
+
+        pm.group(pin_list, name=f"{self.prefix}_ribbon_pins")
+        pm.group(ctl_offset_grp_list, name=f"{self.prefix}_ribbon_ctl")
+        # maybe adding isoparms right before and after middle isoparm would be good
+        # add duplicates of nurbs plane here
+
     def cleanup(self):
         self.log.info("Cleaning Up Setup")
         pm.delete(self.guides_grp)
@@ -360,3 +400,40 @@ def duplicate_and_rename_hierarchy(root_joint, old_name_pattern, new_name_patter
         renamed_list.append(node.rename(new_name))
 
     return renamed_list
+
+
+def distance_between(first_object, second_object):
+    first_joint_translation = pm.xform(first_object, q=True, translation=True, ws=True)
+
+    last_joint_translation = pm.xform(second_object, q=True, translation=True, ws=True)
+
+    distance = ((last_joint_translation[0] - first_joint_translation[0])**2 +
+                (last_joint_translation[1] - first_joint_translation[1])**2 +
+                (last_joint_translation[2] - first_joint_translation[2])**2)**0.5
+
+    return distance
+
+
+def create_nurbs_plane(width, num_u_patches, num_v_patches, name="nurbs"):
+    plane = pm.nurbsPlane(w=width, lr=.2, ax=(0, 0, 1), u=num_u_patches, v=num_v_patches, name=name)[0]
+    return plane
+
+
+def get_child_joints_in_order(root_joint):
+    child_joints = [root_joint]
+
+    def traverse_hierarchy(joint):
+        children = joint.getChildren(ad=True, type='joint')
+        for child in children:
+            if child.getParent() == joint:
+                child_joints.append(child)
+                traverse_hierarchy(child)
+
+    traverse_hierarchy(root_joint)
+
+    return child_joints
+
+
+def match_transforms(source_obj, target_obj, **kwargs):
+    constraint = pm.parentConstraint(source_obj, target_obj, **kwargs)
+    pm.delete(constraint)
