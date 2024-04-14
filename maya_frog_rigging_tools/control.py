@@ -1,18 +1,16 @@
-from ._control import utils
+from ._control import utils as ctl_utils
 import os
-from pathlib import Path
 import logging
 
-# Get the current working directory
-cwd = Path.cwd()
-parent_dir = os.path.dirname(cwd)
-json_dir = os.path.join(parent_dir, "resources", "controls")
+from maya_frog_rigging_tools import utils
 
-LOGGER = logging.getLogger("Rig Controls")
+LOGGER = logging.getLogger("Rig Control")
 
 
 def create(ctl_type, name="ctl", size=1):
-    LOGGER.info(json_dir)
+    root_path = utils.get_project_root()
+    json_dir = os.path.join(root_path, "resources", "controls")
     json_path = os.path.join(json_dir, f"{ctl_type}.json")
     if json_path:
-        return utils.create_ctl_from_json(json_path, name, ctl_size=size)
+        LOGGER.info(f"Creating {ctl_type} control from json")
+        return ctl_utils.create_ctl_from_json(json_path, name, ctl_size=size)
