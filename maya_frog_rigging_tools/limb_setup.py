@@ -37,19 +37,25 @@ class LimbSetup:
 
     def _create_joint_structure(self):
         self.log.info("Duplicating Joint Chain")
-        self.root_chain = [self.root] + self.root.listRelatives(allDescendents=True)
+        self.root_chain = (get_child_joints_in_order(self.root))
         if not len(self.root_chain) > 2:
             raise RuntimeError(
                 "Can't Setup Limb, please input chain with at least 2 elements!"
             )
-        self.fk_chain = duplicate_and_rename_hierarchy(
-            self.root, BND_PATTERN, "_fk"
+        self.fk_chain = get_child_joints_in_order(
+            duplicate_and_rename_hierarchy(
+                self.root, BND_PATTERN, "_fk"
+            )[0]
         )
-        self.ik_chain = duplicate_and_rename_hierarchy(
-            self.root, BND_PATTERN, "_ik"
+        self.ik_chain = get_child_joints_in_order(
+            duplicate_and_rename_hierarchy(
+                self.root, BND_PATTERN, "_ik"
+            )[0]
         )
-        self.stretch_chain = duplicate_and_rename_hierarchy(
-            self.root, BND_PATTERN, "_stretch"
+        self.stretch_chain = get_child_joints_in_order(
+            duplicate_and_rename_hierarchy(
+                self.root, BND_PATTERN, "_stretch"
+            )[0]
         )
         self.jnt_grp = pm.group(self.fk_chain[0], self.ik_chain[0], self.stretch_chain[0], name=f"{self.prefix}")
 
@@ -59,11 +65,11 @@ class LimbSetup:
         self.guide_mapping = {
             "host_guide": {"ctl_shape": "gear"},
             "fk_1_guide": {"joint": self.fk_chain[0], "ctl_shape": "circle"},
-            "fk_2_guide": {"joint": self.fk_chain[2], "ctl_shape": "circle"},
-            "fk_3_guide": {"joint": self.fk_chain[1], "ctl_shape": "circle"},
-            "pole_guide": {"joint": self.ik_chain[2], "ctl_shape": "sphere"},
+            "fk_2_guide": {"joint": self.fk_chain[1], "ctl_shape": "circle"},
+            "fk_3_guide": {"joint": self.fk_chain[2], "ctl_shape": "circle"},
+            "pole_guide": {"world_pos_func": calculate_pole_vector_position, "ctl_shape": "sphere"},
             "root_guide": {"joint": self.root, "ctl_shape": "needle"},
-            "ik_guide": {"joint": self.ik_chain[1], "ctl_shape": "box"}
+            "ik_guide": {"joint": self.ik_chain[2], "ctl_shape": "box"}
         }
         for guide_name, guide_info in self.guide_mapping.items():
             joint = guide_info.get("joint")
@@ -177,7 +183,7 @@ class LimbSetup:
         host_component = next((value for value in self.ctl_data.values() if value['subcomponent'] == 'host'), None)
         host_node = host_component.get("node")
 
-        pm.pointConstraint(self.root_chain[2], host_node, mo=True)
+        pm.pointConstraint(self.root_chain[1], host_node, mo=True)
 
         pm.addAttr(
             host_node,
@@ -258,9 +264,9 @@ class LimbSetup:
 
         chain_start = self.stretch_chain[0]
         ik_start = self.ik_chain[0]
-        chain_middle = self.stretch_chain[2]
-        ik_middle = self.ik_chain[2]
-        chain_end = self.stretch_chain[1]
+        chain_middle = self.stretch_chain[1]
+        ik_middle = self.ik_chain[1]
+        chain_end = self.stretch_chain[2]
 
         dist_1 = pm.createNode("distanceBetween", name=f"{chain_start}_{chain_middle}_dist")
         dist_2 = pm.createNode("distanceBetween", name=f"{chain_middle}_{chain_end}_dist")
@@ -342,8 +348,7 @@ class LimbSetup:
 
     def _setup_ribbon(self):
         self.log.info("Setting up Ribbon")
-        sorted_chain = get_child_joints_in_order(self.root_chain[0])
-        chain_length = distance_between(sorted_chain[0], sorted_chain[-1])
+        chain_length = distance_between(self.root_chain[0], self.root_chain[-1])
         self.log.info(f"Chain Length of {self.root_chain} is {chain_length}")
         base_ribbon = create_nurbs_plane(chain_length, 8, 1, name=f"{self.prefix}_base_ribbon")
         match_transforms(sorted_chain[1], base_ribbon, skipRotate=['x', 'y', 'z'])
