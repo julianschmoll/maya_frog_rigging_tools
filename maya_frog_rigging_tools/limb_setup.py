@@ -63,7 +63,7 @@ class LimbSetup:
         self.log.info("Creating Controls")
         self.guides_grp = pm.group(em=True, name=f"{self.prefix}_guides")
         self.guide_mapping = {
-            "host_guide": {"ctl_shape": "gear"},
+            "host_guide": {"ctl_shape": "gear", "transforms": [90, 0, 0]},
             "fk_1_guide": {"joint": self.fk_chain[0], "ctl_shape": "circle"},
             "fk_2_guide": {"joint": self.fk_chain[1], "ctl_shape": "circle"},
             "fk_3_guide": {"joint": self.fk_chain[2], "ctl_shape": "circle"},
@@ -73,10 +73,23 @@ class LimbSetup:
         }
         for guide_name, guide_info in self.guide_mapping.items():
             joint = guide_info.get("joint")
+            transform = guide_info.get("transforms")
+            world_pos_func = guide_info.get("world_pos_func")
+
             guide = pm.createNode("locator", name=f"{self.prefix}_{guide_name}Shape")
             self.guides_grp.addChild(f"{self.prefix}_{guide_name}")
+
             if joint is not None:
                 pm.matchTransform(guide, joint)
+
+            if transform:
+                pm.rotate(guide, transform, relative=True)
+
+            if world_pos_func:
+                guide_transform = pm.PyNode(f"{self.prefix}_{guide_name}")
+                world_position = world_pos_func(self.root_chain)
+                guide_transform.setTranslation(world_position, space="world")
+
             self.log.info(f"Created {guide}")
 
     def _create_ctl_from_guides(self):
@@ -442,3 +455,24 @@ def get_child_joints_in_order(root_joint):
 def match_transforms(source_obj, target_obj, **kwargs):
     constraint = pm.parentConstraint(source_obj, target_obj, **kwargs)
     pm.delete(constraint)
+
+
+def calculate_pole_vector_position(joint_chain, pole_distance=1):
+    upper_world_transform = joint_chain[0].getTranslation(space='world')
+    middle_world_transform = joint_chain[1].getTranslation(space='world')
+    lower_world_transform = joint_chain[2].getTranslation(space='world')
+
+    upper_length = (middle_world_transform - upper_world_transform).length()
+    lower_length = (lower_world_transform - middle_world_transform).length()
+    distance = (upper_length + lower_length) * 0.5 * pole_distance
+
+    norm_upper_vec = ((upper_world_transform - middle_world_transform).normal() * distance) + middle_world_transform
+    norm_lower_vec = ((lower_world_transform - middle_world_transform).normal() * distance) + middle_world_transform
+
+    mid = norm_upper_vec + (middle_world_transform - norm_upper_vec).projectionOnto(norm_lower_vec - norm_upper_vec)
+
+    mid_pointer = middle_world_transform - mid
+
+    LOGGER.info("Calculated Pole Vector Position")
+
+    return (mid_pointer.normal() * distance) + middle_world_transform
