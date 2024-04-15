@@ -410,6 +410,7 @@ class LimbSetup:
 
 
 def duplicate_and_rename_hierarchy(root_joint, old_name_pattern, new_name_pattern):
+    LOGGER.info(f"Duplicating {root_joint} and its hierarchy.")
     dupl_list: list[DependNode] = [pm.duplicate(root_joint, renameChildren=True)[0]]
     renamed_list = []
 
@@ -421,30 +422,34 @@ def duplicate_and_rename_hierarchy(root_joint, old_name_pattern, new_name_patter
         new_name = re.sub(old_name_pattern, new_name_pattern, old_name)
         if new_name.endswith("1"):
             new_name = new_name[:-1]
-        LOGGER.debug(f"Renaming {old_name} to {new_name}")
+        LOGGER.info(f"Renaming duplicated from {old_name} to {new_name}")
         renamed_list.append(node.rename(new_name))
 
     return renamed_list
 
 
 def distance_between(first_object, second_object):
-    first_joint_translation = pm.xform(first_object, q=True, translation=True, ws=True)
+    LOGGER.info(f"Measuring Distance between {first_object} and {second_object}")
+    first_object_translation = pm.xform(first_object, q=True, translation=True, ws=True)
 
-    last_joint_translation = pm.xform(second_object, q=True, translation=True, ws=True)
+    last_object_translation = pm.xform(second_object, q=True, translation=True, ws=True)
 
-    distance = ((last_joint_translation[0] - first_joint_translation[0])**2 +
-                (last_joint_translation[1] - first_joint_translation[1])**2 +
-                (last_joint_translation[2] - first_joint_translation[2])**2)**0.5
+    distance = ((last_object_translation[0] - first_object_translation[0])**2 +
+                (last_object_translation[1] - first_object_translation[1])**2 +
+                (last_object_translation[2] - first_object_translation[2])**2)**0.5
 
     return distance
 
 
 def create_nurbs_plane(width, num_u_patches, num_v_patches, name="nurbs"):
+    LOGGER.info(f"Creating NURBS Plane '{name}' with {num_u_patches} u patches and {num_v_patches} v patches")
     plane = pm.nurbsPlane(w=width, lr=.2, ax=(0, 0, 1), u=num_u_patches, v=num_v_patches, name=name)[0]
+    plane.delete(constructionHistory=True)
     return plane
 
 
 def get_child_joints_in_order(root_joint):
+    LOGGER.info(f"Ordering Joint Chain of {root_joint}")
     child_joints = [root_joint]
 
     def traverse_hierarchy(joint):
@@ -460,11 +465,13 @@ def get_child_joints_in_order(root_joint):
 
 
 def match_transforms(source_obj, target_obj, **kwargs):
+    LOGGER.info(f"Matching transforms of {source_obj} to {target_obj}")
     constraint = pm.parentConstraint(source_obj, target_obj, **kwargs)
     pm.delete(constraint)
 
 
 def calculate_pole_vector_position(joint_chain, pole_distance=1):
+    # this only works if there is an angle between joints
     upper_world_transform = joint_chain[0].getTranslation(space='world')
     middle_world_transform = joint_chain[1].getTranslation(space='world')
     lower_world_transform = joint_chain[2].getTranslation(space='world')
@@ -477,9 +484,10 @@ def calculate_pole_vector_position(joint_chain, pole_distance=1):
     norm_lower_vec = ((lower_world_transform - middle_world_transform).normal() * distance) + middle_world_transform
 
     mid = norm_upper_vec + (middle_world_transform - norm_upper_vec).projectionOnto(norm_lower_vec - norm_upper_vec)
-
     mid_pointer = middle_world_transform - mid
 
-    LOGGER.info("Calculated Pole Vector Position")
+    LOGGER.info(
+        "Calculated pole position. If there is no angle between joints please make sure to adjust position by hand"
+    )
 
     return (mid_pointer.normal() * distance) + middle_world_transform
