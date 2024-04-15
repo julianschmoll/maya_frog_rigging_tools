@@ -12,7 +12,7 @@ LOGGER = logging.getLogger("Rigging Utils")
 
 
 class LimbSetup:
-    def __init__(self, root_bnd, prefix_name="limb", primary_axis="X", secondary_axis="Y", up_axis="Z", ctl_scale=1):
+    def __init__(self, root_bnd, prefix_name="limb", primary_axis="x", secondary_axis="y", up_axis="z", ctl_scale=1):
         self.log = logging.getLogger("Limb Setup")
         self.log.info("Initializing LimbSetup")
         self.primary_axis = primary_axis
@@ -351,10 +351,14 @@ class LimbSetup:
         pm.connectAttr(f"{calc_squash_scale}.output.outputX", f"{condition}.secondTerm", force=True)
 
         pm.connectAttr(
-            f"{max_stretch_condition}.outColor.outColorR", f"{ik_start}.scale.scale{self.primary_axis}", force=True
+            f"{max_stretch_condition}.outColor.outColorR",
+            f"{ik_start}.scale.scale{self.primary_axis.upper()}",
+            force=True
         )
         pm.connectAttr(
-            f"{max_stretch_condition}.outColor.outColorR", f"{ik_middle}.scale.scale{self.primary_axis}", force=True
+            f"{max_stretch_condition}.outColor.outColorR",
+            f"{ik_middle}.scale.scale{self.primary_axis.upper()}",
+            force=True
         )
 
         pm.setAttr(f"{loc_name}.visibility", 0)
@@ -364,14 +368,14 @@ class LimbSetup:
         chain_length = distance_between(self.root_chain[0], self.root_chain[-1])
         self.log.info(f"Chain Length of {self.root_chain} is {chain_length}")
         base_ribbon = create_nurbs_plane(chain_length, 8, 1, name=f"{self.prefix}_base_ribbon")
-        match_transforms(sorted_chain[1], base_ribbon, skipRotate=['x', 'y', 'z'])
+        match_transforms(self.root_chain[1], base_ribbon, skipRotate=[self.primary_axis.lower()])
         pin_list = ribbon.add_pins_to_ribbon(base_ribbon, 9)
 
         ctl_offset_grp_list = []
 
         for index, pin in enumerate(pin_list):
             jnt = pm.createNode("joint", name=f"{self.prefix}_ribbon_{index}_bnd")
-            match_transforms(sorted_chain[0], jnt)
+            match_transforms(self.root_chain[0], jnt)
             pm.makeIdentity(jnt, apply=True, t=0, r=1, s=0, n=0, pn=True)
             pm.parent(jnt, pin)
             pm.xform(jnt, translation=(0, 0, 0))
