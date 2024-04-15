@@ -35,6 +35,9 @@ class LimbSetup:
         self._create_ik_handle()
         self._setup_stretch()
 
+    def build_ribbon_rig(self):
+        self._setup_ribbon()
+
     def _create_joint_structure(self):
         self.log.info("Duplicating Joint Chain")
         self.root_chain = (get_child_joints_in_order(self.root))
