@@ -277,6 +277,8 @@ class LimbSetup:
         self.log.info("Making Limb Stretchy")
         ik_component = next((value for value in self.ctl_data.values() if value['subcomponent'] == 'ik'), None)
         host_component = next((value for value in self.ctl_data.values() if value['subcomponent'] == 'host'), None)
+        pole_component = next((value for value in self.ctl_data.values() if value['subcomponent'] == 'pole'), None)
+        root_component = next((value for value in self.ctl_data.values() if value['subcomponent'] == 'root'), None)
 
         chain_start = self.stretch_chain[0]
         ik_start = self.ik_chain[0]
@@ -284,32 +286,67 @@ class LimbSetup:
         ik_middle = self.ik_chain[1]
         chain_end = self.stretch_chain[2]
 
-        dist_1 = pm.createNode("distanceBetween", name=f"{chain_start}_{chain_middle}_dist")
-        dist_2 = pm.createNode("distanceBetween", name=f"{chain_middle}_{chain_end}_dist")
+        pole_ctl = pole_component.get("node")
 
-        pm.connectAttr(f"{chain_start}.worldMatrix[0]", f"{dist_1}.inMatrix1", force=True)
-        pm.connectAttr(f"{chain_middle}.worldMatrix[0]", f"{dist_1}.inMatrix2", force=True)
-        pm.connectAttr(f"{chain_middle}.worldMatrix[0]", f"{dist_2}.inMatrix1", force=True)
-        pm.connectAttr(f"{chain_end}.worldMatrix[0]", f"{dist_2}.inMatrix2", force=True)
+        upper_dist = pm.createNode("distanceBetween", name=f"{chain_start}_{chain_middle}_dist")
+        lower_dist = pm.createNode("distanceBetween", name=f"{chain_middle}_{chain_end}_dist")
+
+        pm.connectAttr(f"{chain_start}.worldMatrix[0]", f"{upper_dist}.inMatrix1", force=True)
+        pm.connectAttr(f"{chain_middle}.worldMatrix[0]", f"{upper_dist}.inMatrix2", force=True)
+
+        pm.connectAttr(f"{chain_middle}.worldMatrix[0]", f"{lower_dist}.inMatrix1", force=True)
+        pm.connectAttr(f"{chain_end}.worldMatrix[0]", f"{lower_dist}.inMatrix2", force=True)
 
         base_length = pm.createNode("addDoubleLinear", name=f"{self.prefix}_length")
-        pm.connectAttr(f"{dist_1}.distance", f"{base_length}.input1")
-        pm.connectAttr(f"{dist_2}.distance", f"{base_length}.input2")
 
-        loc_name = f"{self.prefix}_end"
-        pm.createNode("locator", name=f"{loc_name}Shape")
-        pm.matchTransform(loc_name, ik_component.get("node"))
-        pm.parent(loc_name, ik_component.get("node"))
-        stretch_length = pm.createNode("distanceBetween", name=f"{chain_start}_{loc_name}_dist")
+        pm.connectAttr(f"{upper_dist}.distance", f"{base_length}.input1")
+        pm.connectAttr(f"{lower_dist}.distance", f"{base_length}.input2")
+
+        end_loc = f"{self.prefix}_end"
+
+        pm.createNode("locator", name=f"{end_loc}Shape")
+        pm.matchTransform(end_loc, ik_component.get("node"))
+
+        pm.parent(end_loc, ik_component.get("node"))
+        stretch_length = pm.createNode("distanceBetween", name=f"{chain_start}_{end_loc}_dist")
+
         pm.connectAttr(f"{chain_start}.worldMatrix[0]", f"{stretch_length}.inMatrix1", force=True)
-        pm.connectAttr(f"{loc_name}.worldMatrix[0]", f"{stretch_length}.inMatrix2", force=True)
+        pm.connectAttr(f"{end_loc}.worldMatrix[0]", f"{stretch_length}.inMatrix2", force=True)
+
+        start_loc = f"{self.prefix}_start"
+        pm.createNode("locator", name=f"{start_loc}Shape")
+        pm.matchTransform(start_loc, root_component.get("node"))
+        pm.parent(start_loc, root_component.get("node"))
+
+        root_pole_length = pm.createNode("distanceBetween", name=f"{start_loc}_{pole_ctl}_dist")
+        end_pole_length = pm.createNode("distanceBetween", name=f"{end_loc}_{pole_ctl}_dist")
+
+        pm.connectAttr(f"{pole_ctl}.worldMatrix[0]", f"{root_pole_length}.inMatrix1", force=True)
+        pm.connectAttr(f"{start_loc}.worldMatrix[0]", f"{root_pole_length}.inMatrix2", force=True)
+
+        pm.connectAttr(f"{pole_ctl}.worldMatrix[0]", f"{end_pole_length}.inMatrix1", force=True)
+        pm.connectAttr(f"{end_loc}.worldMatrix[0]", f"{end_pole_length}.inMatrix2", force=True)
+
+        lock_upper_scale = pm.createNode("multiplyDivide", name=f"{self.prefix}lock_upper_scale")
+        lock_lower_scale = pm.createNode("multiplyDivide", name=f"{self.prefix}lock_lower_scale")
+
+        pm.connectAttr(f"{root_pole_length}.distance", f"{lock_upper_scale}.input1.input1X", force=True)
+        pm.connectAttr(f"{upper_dist}.distance", f"{lock_upper_scale}.input2.input2X", force=True)
+
+        pm.connectAttr(f"{end_pole_length}.distance", f"{lock_lower_scale}.input1.input1X", force=True)
+        pm.connectAttr(f"{lower_dist}.distance", f"{lock_lower_scale}.input2.input2X", force=True)
+
+        pm.setAttr(f"{lock_upper_scale}.operation", 2)
+        pm.setAttr(f"{lock_lower_scale}.operation", 2)
 
         condition = pm.createNode("condition", name=f"{self.prefix}_stretch_cond")
         pm.setAttr(f"{condition}.operation", 2)
         pm.connectAttr(f"{stretch_length}.distance", f"{condition}.firstTerm", force=True)
 
         calc_scale = pm.createNode("multiplyDivide", name=f"{self.prefix}_stretch_scale")
+
         pm.setAttr(f"{calc_scale}.operation", 2)
+
         pm.connectAttr(f"{base_length}.output", f"{calc_scale}.input2.input2X", force=True)
         pm.connectAttr(f"{stretch_length}.distance", f"{calc_scale}.input1.input1X", force=True)
         pm.connectAttr(f"{calc_scale}.output.outputX", f"{condition}.colorIfTrue.colorIfTrueR", force=True)
@@ -353,18 +390,59 @@ class LimbSetup:
         pm.connectAttr(f"{base_length}.output", f"{calc_squash_scale}.input2.input2X", force=True)
         pm.connectAttr(f"{calc_squash_scale}.output.outputX", f"{condition}.secondTerm", force=True)
 
+        upper_lock_blend = pm.createNode("blendColors", name=f"{self.prefix}_upper_lock_blend")
+        lower_lock_blend = pm.createNode("blendColors", name=f"{self.prefix}_lower_lock_blend")
+
         pm.connectAttr(
             f"{max_stretch_condition}.outColor.outColorR",
+            f"{upper_lock_blend}.color2R",
+            force=True
+        )
+
+        pm.connectAttr(
+            f"{max_stretch_condition}.outColor.outColorR",
+            f"{lower_lock_blend}.color2R",
+            force=True
+        )
+
+        pm.connectAttr(
+            f"{lock_upper_scale}.output.outputX",
+            f"{upper_lock_blend}.color1R",
+            force=True
+        )
+
+        pm.connectAttr(
+            f"{lock_lower_scale}.output.outputX",
+            f"{lower_lock_blend}.color1R",
+            force=True
+        )
+
+        pm.connectAttr(
+            f"{upper_lock_blend}.output.outputR",
             f"{ik_start}.scale.scale{self.primary_axis.upper()}",
             force=True
         )
         pm.connectAttr(
-            f"{max_stretch_condition}.outColor.outColorR",
+            f"{lower_lock_blend}.output.outputR",
             f"{ik_middle}.scale.scale{self.primary_axis.upper()}",
             force=True
         )
 
-        pm.setAttr(f"{loc_name}.visibility", 0)
+        pm.addAttr(
+            host_node,
+            longName="poleLock",
+            attributeType='float',
+            minValue=0,
+            maxValue=1,
+            defaultValue=0,
+            keyable=True
+        )
+
+        pm.connectAttr(f"{host_node}.poleLock", f"{upper_lock_blend}.blender", force=True)
+        pm.connectAttr(f"{host_node}.poleLock", f"{lower_lock_blend}.blender", force=True)
+
+        pm.setAttr(f"{end_loc}.visibility", 0)
+        pm.setAttr(f"{start_loc}.visibility", 0)
 
     def _setup_ribbon(self):
         self.log.info("Setting up Ribbon")
@@ -444,7 +522,7 @@ def distance_between(first_object, second_object):
 def create_nurbs_plane(width, num_u_patches, num_v_patches, name="nurbs"):
     LOGGER.info(f"Creating NURBS Plane '{name}' with {num_u_patches} u patches and {num_v_patches} v patches")
     plane = pm.nurbsPlane(w=width, lr=.2, ax=(0, 0, 1), u=num_u_patches, v=num_v_patches, name=name)[0]
-    plane.delete(constructionHistory=True)
+    pm.delete(plane, constructionHistory=True)
     return plane
 
 
