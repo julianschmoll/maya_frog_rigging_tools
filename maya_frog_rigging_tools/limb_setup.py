@@ -446,10 +446,14 @@ class LimbSetup:
 
     def _setup_ribbon(self):
         self.log.info("Setting up Ribbon")
-        chain_length = distance_between(self.root_chain[0], self.root_chain[-1])
-        self.log.info(f"Chain Length of {self.root_chain} is {chain_length}")
+
+        bezier_ribbon = ribbon.create_bezier_ribbon(
+            self.root_chain,
+            name=f"{self.prefix}_rbbn"
+        )
+
         base_ribbon = create_nurbs_plane(chain_length, 8, 1, name=f"{self.prefix}_base_ribbon")
-        match_transforms(self.root_chain[1], base_ribbon, skipRotate=[self.primary_axis.lower()])
+
         pin_list = ribbon.add_pins_to_ribbon(base_ribbon, 9)
 
         ctl_offset_grp_list = []

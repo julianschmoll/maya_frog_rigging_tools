@@ -1,5 +1,7 @@
 import pymel.core as pm
 
+from maya_frog_rigging_tools import control
+from maya_frog_rigging_tools import utils
 
 def add_pins_to_ribbon(ribbon, number_of_pins):
     param_length_u = ribbon.getShape().minMaxRangeU.get()
@@ -11,6 +13,57 @@ def add_pins_to_ribbon(ribbon, number_of_pins):
         pin_list.append(pin_to_surface(ribbon, u_pos=u_pos, name_suf=str(i)))
 
     return pin_list
+
+
+def create_bezier_ribbon(jnt_chain, prim_axis="x", name="bezier_rbbn"):
+    pins = {
+        "start_pin": {"parent": jnt_chain[0], "curve_points": [0, 1]},
+        "end_pin": {"parent": jnt_chain[-1], "curve_points": [5, 6]},
+        "mid_pin": {"curve_points": [3], "tangent": True},
+        "start_mid": {"align": [jnt_chain[0], jnt_chain[1]], "curve_points": [2], "tangent": True},
+        "end_mid": {"align": [jnt_chain[1], jnt_chain[2]], "curve_points": [4], "tangent": True},
+    }
+
+    bezier_points = [
+        (0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0)
+    ]
+    bezier_curve = pm.curve(p=bezier_points, bezier=True, name=f"{name}_bezier")
+    tangent_grp = pm.group(name=f"{name}_tangent", empty=True)
+    pin_grp = pm.group(tangent_grp, name=f"{name}_pins")
+    pm.group(pin_grp, bezier_curve, name=f"{name}_null")
+
+    for pin, pin_data in pins.items():
+        pin_node = control.create("sphere", f"{name}_{pin}")
+        srt_grp = pm.group(pin_node, name=f"{pin_node}_srt")
+        null_grp = pm.group(srt_grp, name=f"{pin_node}_null")
+
+        pm.setAttr(f"{pin_node}.visibility", 0)
+        curve_points = pin_data.get("curve_points")
+
+        if pin_data.get("parent"):
+            pm.parentConstraint(pin_data.get("parent"), srt_grp, name=f"{pin_data.get('parent')}_{pin}_constraint")
+
+        if pin_data.get("align"):
+            if len(pin_data.get("align")) > 2:
+                raise ValueError("Can't align between more than 2 objects")
+            utils.align_center(*pin_data.get("align"), srt_grp)
+
+        if pin_data.get("tangent"):
+            pm.parent(null_grp, tangent_grp)
+        else:
+            pm.parent(null_grp, pin_grp)
+
+        for curve_point in curve_points:
+            decompose_matrix = pm.createNode("decomposeMatrix", name=f"{pin_node}_{curve_point}_dcmp")
+            pm.connectAttr(
+                f"{pin_node}.worldMatrix[0]", f"{decompose_matrix}.inputMatrix", f=True
+            )
+            pm.connectAttr(
+                f"{decompose_matrix}.outputTranslate", f"{bezier_curve}.controlPoints[{curve_point}]", f=True
+            )
+
+    pm.pointConstraint(jnt_chain[1], tangent_grp)
+    pm.tangentConstraint(f"{name}_start_pin", f"{name}_end_pin", tangent_grp)
 
 
 def pin_to_surface(nurbs_surface, u_pos=0.5, v_pos=0.5, name_suf="#"):
