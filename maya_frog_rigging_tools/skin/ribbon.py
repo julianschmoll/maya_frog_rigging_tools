@@ -65,6 +65,8 @@ def create_bezier_ribbon(jnt_chain, prim_axis="x", name="bezier_rbbn"):
     pm.pointConstraint(jnt_chain[1], tangent_grp)
     pm.tangentConstraint(f"{name}_start_pin", f"{name}_end_pin", tangent_grp)
 
+    return ribbon
+
 
 def pin_to_surface(nurbs_surface, u_pos=0.5, v_pos=0.5, name_suf="#"):
     # Adjusted from Chris Lesage (https://gist.github.com/chris-lesage/0dd01f1af56c00668f867393bb68c4d7)

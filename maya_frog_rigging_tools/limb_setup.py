@@ -199,7 +199,7 @@ class LimbSetup:
         host_component = next((value for value in self.ctl_data.values() if value['subcomponent'] == 'host'), None)
         host_node = host_component.get("node")
 
-        pm.pointConstraint(self.root_chain[1], host_node, mo=True)
+        pm.pointConstraint(self.root_chain[1], host_component.get("srt"), mo=True)
 
         pm.addAttr(
             host_node,
@@ -288,19 +288,50 @@ class LimbSetup:
 
         pole_ctl = pole_component.get("node")
 
-        upper_dist = pm.createNode("distanceBetween", name=f"{chain_start}_{chain_middle}_dist")
-        lower_dist = pm.createNode("distanceBetween", name=f"{chain_middle}_{chain_end}_dist")
+        upper_dist = pm.createNode(
+            "distanceBetween",
+            name=f"{chain_start}_{chain_middle}_dist"
+        )
+        lower_dist = pm.createNode(
+            "distanceBetween",
+            name=f"{chain_middle}_{chain_end}_dist"
+        )
 
-        pm.connectAttr(f"{chain_start}.worldMatrix[0]", f"{upper_dist}.inMatrix1", force=True)
-        pm.connectAttr(f"{chain_middle}.worldMatrix[0]", f"{upper_dist}.inMatrix2", force=True)
+        pm.connectAttr(
+            f"{chain_start}.worldMatrix[0]",
+            f"{upper_dist}.inMatrix1",
+            force=True
+        )
+        pm.connectAttr(
+            f"{chain_middle}.worldMatrix[0]",
+            f"{upper_dist}.inMatrix2",
+            force=True
+        )
 
-        pm.connectAttr(f"{chain_middle}.worldMatrix[0]", f"{lower_dist}.inMatrix1", force=True)
-        pm.connectAttr(f"{chain_end}.worldMatrix[0]", f"{lower_dist}.inMatrix2", force=True)
+        pm.connectAttr(
+            f"{chain_middle}.worldMatrix[0]",
+            f"{lower_dist}.inMatrix1",
+            force=True
+        )
+        pm.connectAttr(
+            f"{chain_end}.worldMatrix[0]",
+            f"{lower_dist}.inMatrix2",
+            force=True
+        )
 
-        base_length = pm.createNode("addDoubleLinear", name=f"{self.prefix}_length")
+        base_length = pm.createNode(
+            "addDoubleLinear",
+            name=f"{self.prefix}_length"
+        )
 
-        pm.connectAttr(f"{upper_dist}.distance", f"{base_length}.input1")
-        pm.connectAttr(f"{lower_dist}.distance", f"{base_length}.input2")
+        pm.connectAttr(
+            f"{upper_dist}.distance",
+            f"{base_length}.input1"
+        )
+        pm.connectAttr(
+            f"{lower_dist}.distance",
+            f"{base_length}.input2"
+        )
 
         end_loc = f"{self.prefix}_end"
 
@@ -310,8 +341,16 @@ class LimbSetup:
         pm.parent(end_loc, ik_component.get("node"))
         stretch_length = pm.createNode("distanceBetween", name=f"{chain_start}_{end_loc}_dist")
 
-        pm.connectAttr(f"{chain_start}.worldMatrix[0]", f"{stretch_length}.inMatrix1", force=True)
-        pm.connectAttr(f"{end_loc}.worldMatrix[0]", f"{stretch_length}.inMatrix2", force=True)
+        pm.connectAttr(
+            f"{chain_start}.worldMatrix[0]",
+            f"{stretch_length}.inMatrix1",
+            force=True
+        )
+        pm.connectAttr(
+            f"{end_loc}.worldMatrix[0]",
+            f"{stretch_length}.inMatrix2",
+            force=True
+        )
 
         start_loc = f"{self.prefix}_start"
         pm.createNode("locator", name=f"{start_loc}Shape")
@@ -321,37 +360,86 @@ class LimbSetup:
         root_pole_length = pm.createNode("distanceBetween", name=f"{start_loc}_{pole_ctl}_dist")
         end_pole_length = pm.createNode("distanceBetween", name=f"{end_loc}_{pole_ctl}_dist")
 
-        pm.connectAttr(f"{pole_ctl}.worldMatrix[0]", f"{root_pole_length}.inMatrix1", force=True)
-        pm.connectAttr(f"{start_loc}.worldMatrix[0]", f"{root_pole_length}.inMatrix2", force=True)
+        pm.connectAttr(
+            f"{pole_ctl}.worldMatrix[0]",
+            f"{root_pole_length}.inMatrix1",
+            force=True
+        )
+        pm.connectAttr(
+            f"{start_loc}.worldMatrix[0]",
+            f"{root_pole_length}.inMatrix2",
+            force=True
+        )
 
-        pm.connectAttr(f"{pole_ctl}.worldMatrix[0]", f"{end_pole_length}.inMatrix1", force=True)
-        pm.connectAttr(f"{end_loc}.worldMatrix[0]", f"{end_pole_length}.inMatrix2", force=True)
+        pm.connectAttr(
+            f"{pole_ctl}.worldMatrix[0]",
+            f"{end_pole_length}.inMatrix1",
+            force=True
+        )
+        pm.connectAttr(
+            f"{end_loc}.worldMatrix[0]",
+            f"{end_pole_length}.inMatrix2",
+            force=True
+        )
 
         lock_upper_scale = pm.createNode("multiplyDivide", name=f"{self.prefix}lock_upper_scale")
         lock_lower_scale = pm.createNode("multiplyDivide", name=f"{self.prefix}lock_lower_scale")
 
-        pm.connectAttr(f"{root_pole_length}.distance", f"{lock_upper_scale}.input1.input1X", force=True)
-        pm.connectAttr(f"{upper_dist}.distance", f"{lock_upper_scale}.input2.input2X", force=True)
+        pm.connectAttr(
+            f"{root_pole_length}.distance",
+            f"{lock_upper_scale}.input1.input1X",
+            force=True
+        )
+        pm.connectAttr(
+            f"{upper_dist}.distance",
+            f"{lock_upper_scale}.input2.input2X",
+            force=True
+        )
 
-        pm.connectAttr(f"{end_pole_length}.distance", f"{lock_lower_scale}.input1.input1X", force=True)
-        pm.connectAttr(f"{lower_dist}.distance", f"{lock_lower_scale}.input2.input2X", force=True)
+        pm.connectAttr(
+            f"{end_pole_length}.distance",
+            f"{lock_lower_scale}.input1.input1X",
+            force=True
+        )
+        pm.connectAttr(
+            f"{lower_dist}.distance",
+            f"{lock_lower_scale}.input2.input2X",
+            force=True
+        )
 
         pm.setAttr(f"{lock_upper_scale}.operation", 2)
         pm.setAttr(f"{lock_lower_scale}.operation", 2)
 
         condition = pm.createNode("condition", name=f"{self.prefix}_stretch_cond")
         pm.setAttr(f"{condition}.operation", 2)
-        pm.connectAttr(f"{stretch_length}.distance", f"{condition}.firstTerm", force=True)
+        pm.connectAttr(
+            f"{stretch_length}.distance",
+            f"{condition}.firstTerm",
+            force=True
+        )
 
         calc_scale = pm.createNode("multiplyDivide", name=f"{self.prefix}_stretch_scale")
 
         pm.setAttr(f"{calc_scale}.operation", 2)
 
-        pm.connectAttr(f"{base_length}.output", f"{calc_scale}.input2.input2X", force=True)
-        pm.connectAttr(f"{stretch_length}.distance", f"{calc_scale}.input1.input1X", force=True)
-        pm.connectAttr(f"{calc_scale}.output.outputX", f"{condition}.colorIfTrue.colorIfTrueR", force=True)
+        pm.connectAttr(
+            f"{base_length}.output",
+            f"{calc_scale}.input2.input2X",
+            force=True
+        )
+        pm.connectAttr(
+            f"{stretch_length}.distance",
+            f"{calc_scale}.input1.input1X",
+            force=True
+        )
+        pm.connectAttr(
+            f"{calc_scale}.output.outputX",
+            f"{condition}.colorIfTrue.colorIfTrueR",
+            force=True
+        )
 
         host_node = host_component.get("node")
+
         pm.addAttr(
             host_node,
             longName="maxStretch",
@@ -370,25 +458,80 @@ class LimbSetup:
             defaultValue=0,
             keyable=True
         )
+
+        pm.addAttr(
+            host_node,
+            longName="poleLock",
+            attributeType='float',
+            minValue=0,
+            maxValue=1,
+            defaultValue=0,
+            keyable=True
+        )
+
+        pm.addAttr(
+            host_node,
+            longName="poleSpace",
+            attributeType='float',
+            minValue=0,
+            maxValue=1,
+            defaultValue=0.5,
+            keyable=True
+        )
+
         squash_reverse = pm.createNode("reverse", name=f"{self.prefix}_squash_reverse")
-        pm.connectAttr(f"{host_node}.maxSquash", squash_reverse.attr('inputX'), force=True)
+        pm.connectAttr(
+            f"{host_node}.maxSquash",
+            squash_reverse.attr('inputX'),
+            force=True
+        )
 
         max_stretch_condition = pm.createNode("condition", name=f"{self.prefix}_max_stretch_cond")
 
         pm.setAttr(f"{max_stretch_condition}.operation", 2)
         pm.connectAttr(
-            f"{condition}.outColor.outColorR", f"{max_stretch_condition}.colorIfTrue.colorIfTrueR", force=True
+            f"{condition}.outColor.outColorR",
+            f"{max_stretch_condition}.colorIfTrue.colorIfTrueR",
+            force=True
         )
-        pm.connectAttr(f"{host_node}.maxStretch", f"{max_stretch_condition}.colorIfFalse.colorIfFalseR", force=True)
+        pm.connectAttr(
+            f"{host_node}.maxStretch",
+            f"{max_stretch_condition}.colorIfFalse.colorIfFalseR",
+            force=True
+        )
 
-        pm.connectAttr(f"{condition}.outColor.outColorR", f"{max_stretch_condition}.secondTerm", force=True)
-        pm.connectAttr(f"{host_node}.maxStretch", f"{max_stretch_condition}.firstTerm", force=True)
+        pm.connectAttr(
+            f"{condition}.outColor.outColorR",
+            f"{max_stretch_condition}.secondTerm",
+            force=True
+        )
+        pm.connectAttr(
+            f"{host_node}.maxStretch",
+            f"{max_stretch_condition}.firstTerm",
+            force=True
+        )
 
         calc_squash_scale = pm.createNode("multiplyDivide", name=f"{self.prefix}_squash_scale")
-        pm.connectAttr(f"{squash_reverse}.output.outputX", f"{calc_squash_scale}.input1.input1X", force=True)
-        pm.connectAttr(f"{squash_reverse}.output.outputX", f"{condition}.colorIfFalse.colorIfFalseR", force=True)
-        pm.connectAttr(f"{base_length}.output", f"{calc_squash_scale}.input2.input2X", force=True)
-        pm.connectAttr(f"{calc_squash_scale}.output.outputX", f"{condition}.secondTerm", force=True)
+        pm.connectAttr(
+            f"{squash_reverse}.output.outputX",
+            f"{calc_squash_scale}.input1.input1X",
+            force=True
+        )
+        pm.connectAttr(
+            f"{squash_reverse}.output.outputX",
+            f"{condition}.colorIfFalse.colorIfFalseR",
+            force=True
+        )
+        pm.connectAttr(
+            f"{base_length}.output",
+            f"{calc_squash_scale}.input2.input2X",
+            force=True
+        )
+        pm.connectAttr(
+            f"{calc_squash_scale}.output.outputX",
+            f"{condition}.secondTerm",
+            force=True
+        )
 
         upper_lock_blend = pm.createNode("blendColors", name=f"{self.prefix}_upper_lock_blend")
         lower_lock_blend = pm.createNode("blendColors", name=f"{self.prefix}_lower_lock_blend")
@@ -428,18 +571,78 @@ class LimbSetup:
             force=True
         )
 
-        pm.addAttr(
-            host_node,
-            longName="poleLock",
-            attributeType='float',
-            minValue=0,
-            maxValue=1,
-            defaultValue=0,
-            keyable=True
+        pm.connectAttr(
+            f"{host_node}.poleLock",
+            f"{upper_lock_blend}.blender",
+            force=True
+        )
+        pm.connectAttr(
+            f"{host_node}.poleLock",
+            f"{lower_lock_blend}.blender",
+            force=True
         )
 
-        pm.connectAttr(f"{host_node}.poleLock", f"{upper_lock_blend}.blender", force=True)
-        pm.connectAttr(f"{host_node}.poleLock", f"{lower_lock_blend}.blender", force=True)
+        pole_space_rev = pm.createNode("reverse", name=f"{self.prefix}_pole_space_rev")
+        pole_rev = pm.createNode("reverse", name=f"{self.prefix}_pole_rev")
+        pole_parent_weight = pm.createNode("multiplyDivide", name=f"{self.prefix}_pole_weight")
+
+        pm.connectAttr(
+            f"{host_node}.poleSpace",
+            f"{pole_space_rev}.input.inputX",
+            force=True
+        )
+
+        pm.connectAttr(
+            f"{host_node}.poleSpace",
+            f"{pole_parent_weight}.input2.input2Y",
+            force=True
+        )
+
+        # wrong
+        pm.connectAttr(
+            f"{pole_space_rev}.output.outputX",
+            f"{pole_parent_weight}.input2.input2X",
+            force=True
+        )
+
+        pm.connectAttr(
+            f"{host_node}.poleLock",
+            f"{pole_rev}.input.inputX",
+            force=True
+        )
+
+        pm.connectAttr(
+            f"{pole_rev}.output.outputX",
+            f"{pole_parent_weight}.input1.input1X",
+            force=True
+        )
+
+        pm.connectAttr(
+            f"{pole_rev}.output.outputX",
+            f"{pole_parent_weight}.input1.input1Y",
+            force=True
+        )
+
+        pole_space = pm.parentConstraint(
+            start_loc,
+            end_loc,
+            pole_component.get("srt"),
+            mo=True,
+            weight=1,
+            name=f"{self.prefix}_pole_space_constr"
+        )
+
+        pm.connectAttr(
+            f"{pole_parent_weight}.output.outputX",
+            pole_space.attr('w0'),
+            force=True
+        )
+
+        pm.connectAttr(
+            f"{pole_parent_weight}.output.outputY",
+            pole_space.attr('w1'),
+            force=True
+        )
 
         pm.setAttr(f"{end_loc}.visibility", 0)
         pm.setAttr(f"{start_loc}.visibility", 0)
@@ -452,9 +655,7 @@ class LimbSetup:
             name=f"{self.prefix}_rbbn"
         )
 
-        base_ribbon = create_nurbs_plane(chain_length, 8, 1, name=f"{self.prefix}_base_ribbon")
-
-        pin_list = ribbon.add_pins_to_ribbon(base_ribbon, 9)
+        pin_list = ribbon.add_pins_to_ribbon(bezier_ribbon, 9)
 
         ctl_offset_grp_list = []
 
