@@ -3,6 +3,7 @@ import pymel.core as pm
 from maya_frog_rigging_tools import control
 from maya_frog_rigging_tools import utils
 
+
 def add_pins_to_ribbon(ribbon, number_of_pins):
     param_length_u = ribbon.getShape().minMaxRangeU.get()
 
@@ -19,17 +20,19 @@ def create_bezier_ribbon(jnt_chain, prim_axis="x", name="bezier_rbbn"):
     pins = {
         "start_pin": {"parent": jnt_chain[0], "curve_points": [0, 1]},
         "end_pin": {"parent": jnt_chain[-1], "curve_points": [5, 6]},
-        "mid_pin": {"curve_points": [3], "tangent": True},
-        "start_mid": {"align": [jnt_chain[0], jnt_chain[1]], "curve_points": [2], "tangent": True},
-        "end_mid": {"align": [jnt_chain[1], jnt_chain[2]], "curve_points": [4], "tangent": True},
+        "mid_pin": {"match_transforms": jnt_chain[1], "curve_points": [3], "tangent": True},
+        "start_mid": {"pos": 2, "curve_points": [2], "tangent": True},
+        "end_mid": {"pos": 4, "curve_points": [4], "tangent": True},
     }
 
-    bezier_points = [
-        (0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0)
-    ]
+    bezier_points = get_bezier_points(jnt_chain)
+
     bezier_curve = pm.curve(p=bezier_points, bezier=True, name=f"{name}_bezier")
     tangent_grp = pm.group(name=f"{name}_tangent", empty=True)
-    pin_grp = pm.group(tangent_grp, name=f"{name}_pins")
+    tangent_null = pm.group(tangent_grp, name=f"{name}_tangent_null")
+    utils.match_transforms(jnt_chain[1], tangent_null)
+
+    pin_grp = pm.group(tangent_null, name=f"{name}_pins")
     pm.group(pin_grp, bezier_curve, name=f"{name}_null")
 
     for pin, pin_data in pins.items():
@@ -43,10 +46,11 @@ def create_bezier_ribbon(jnt_chain, prim_axis="x", name="bezier_rbbn"):
         if pin_data.get("parent"):
             pm.parentConstraint(pin_data.get("parent"), srt_grp, name=f"{pin_data.get('parent')}_{pin}_constraint")
 
-        if pin_data.get("align"):
-            if len(pin_data.get("align")) > 2:
-                raise ValueError("Can't align between more than 2 objects")
-            utils.align_center(*pin_data.get("align"), srt_grp)
+        if pin_data.get("pos"):
+            pm.xform(srt_grp, t=bezier_points[pin_data.get("pos")], ws=True)
+
+        if pin_data.get("match_transforms"):
+            utils.match_transforms(pin_data.get("match_transforms"), srt_grp)
 
         if pin_data.get("tangent"):
             pm.parent(null_grp, tangent_grp)
@@ -62,10 +66,48 @@ def create_bezier_ribbon(jnt_chain, prim_axis="x", name="bezier_rbbn"):
                 f"{decompose_matrix}.outputTranslate", f"{bezier_curve}.controlPoints[{curve_point}]", f=True
             )
 
-    pm.pointConstraint(jnt_chain[1], tangent_grp)
-    pm.tangentConstraint(f"{name}_start_pin", f"{name}_end_pin", tangent_grp)
+    constrain_tangent(jnt_chain, name, tangent_null)
 
+    ribbon = None
     return ribbon
+
+
+def constrain_tangent(jnt_chain, name, tangent_null):
+    pm.pointConstraint(jnt_chain[1], tangent_null, name=f"{name}_{tangent_null}_point_constraint")
+    chain_start_matrix = pm.createNode("decomposeMatrix", name=f"{name}_{jnt_chain[0]}_tang_dcmp")
+    chain_middle_matrix = pm.createNode("decomposeMatrix", name=f"{name}_{jnt_chain[1]}_tang_dcmp")
+    blend_rotation = pm.createNode("blendColors", name=f"{name}_{jnt_chain[0]}_{jnt_chain[1]}_tang_blend")
+    pm.connectAttr(
+        f"{jnt_chain[0]}.worldMatrix[0]", f"{chain_start_matrix}.inputMatrix", f=True
+    )
+    pm.connectAttr(
+        f"{jnt_chain[1]}.worldMatrix[0]", f"{chain_middle_matrix}.inputMatrix", f=True
+    )
+    pm.connectAttr(
+        f"{chain_start_matrix}.outputRotate", f"{blend_rotation}.color1", f=True
+    )
+    pm.connectAttr(
+        f"{chain_middle_matrix}.outputRotate", f"{blend_rotation}.color2", f=True
+    )
+    pm.connectAttr(
+        f"{blend_rotation}.output", f"{tangent_null}.rotate", f=True
+    )
+
+
+def get_bezier_points(joints):
+    point_list = []
+
+    for joint in joints:
+        point_list.append(
+            tuple(joint.getTranslation(space='world'))
+        )
+
+    point_list.insert(0, point_list[0])
+    point_list.insert(3, point_list[3])
+    point_list.insert(2, utils.get_center([point_list[0], point_list[2]]))
+    point_list.insert(4, utils.get_center([point_list[3], point_list[4]]))
+
+    return point_list
 
 
 def pin_to_surface(nurbs_surface, u_pos=0.5, v_pos=0.5, name_suf="#"):
