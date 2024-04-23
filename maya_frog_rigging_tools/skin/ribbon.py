@@ -16,24 +16,27 @@ def add_pins_to_ribbon(ribbon, number_of_pins):
     return pin_list
 
 
-def create_bezier_ribbon(jnt_chain, prim_axis="x", name="bezier_rbbn"):
+def create_bezier_ribbon(jnt_chain, offset_up=(0, 0, 1), offset_low=(0, 0, -1), name="bezier_rbbn"):
     pins = {
         "start_pin": {"parent": jnt_chain[0], "curve_points": [0, 1]},
         "end_pin": {"parent": jnt_chain[-1], "curve_points": [5, 6]},
         "mid_pin": {"match_transforms": jnt_chain[1], "curve_points": [3], "tangent": True},
-        "start_mid": {"pos": 2, "curve_points": [2], "tangent": True},
-        "end_mid": {"pos": 4, "curve_points": [4], "tangent": True},
+        "start_mid": {"match_transforms": jnt_chain[1], "pos": 2, "curve_points": [2], "tangent": True},
+        "end_mid": {"match_transforms": jnt_chain[1], "pos": 4, "curve_points": [4], "tangent": True},
     }
 
     bezier_points = get_bezier_points(jnt_chain)
 
     bezier_curve = pm.curve(p=bezier_points, bezier=True, name=f"{name}_bezier")
+    up_curve = pm.curve(p=bezier_points, bezier=True, name=f"{name}_up_loft_bezier")
+    low_curve = pm.curve(p=bezier_points, bezier=True, name=f"{name}_low_loft_bezier")
+
     tangent_grp = pm.group(name=f"{name}_tangent", empty=True)
     tangent_null = pm.group(tangent_grp, name=f"{name}_tangent_null")
     utils.match_transforms(jnt_chain[1], tangent_null)
 
     pin_grp = pm.group(tangent_null, name=f"{name}_pins")
-    pm.group(pin_grp, bezier_curve, name=f"{name}_null")
+    parent_group = pm.group(pin_grp, bezier_curve, up_curve, low_curve, name=f"{name}_null")
 
     for pin, pin_data in pins.items():
         pin_node = control.create("sphere", f"{name}_{pin}")
@@ -46,30 +49,67 @@ def create_bezier_ribbon(jnt_chain, prim_axis="x", name="bezier_rbbn"):
         if pin_data.get("parent"):
             pm.parentConstraint(pin_data.get("parent"), srt_grp, name=f"{pin_data.get('parent')}_{pin}_constraint")
 
-        if pin_data.get("pos"):
-            pm.xform(srt_grp, t=bezier_points[pin_data.get("pos")], ws=True)
-
         if pin_data.get("match_transforms"):
             utils.match_transforms(pin_data.get("match_transforms"), srt_grp)
+
+        if pin_data.get("pos"):
+            pm.xform(srt_grp, t=bezier_points[pin_data.get("pos")], ws=True)
 
         if pin_data.get("tangent"):
             pm.parent(null_grp, tangent_grp)
         else:
             pm.parent(null_grp, pin_grp)
 
+        upper_pin = pm.duplicate(pin_node, name=f"{name}_up_{pin}")[0]
+        lower_pin = pm.duplicate(pin_node, name=f"{name}_low_{pin}")[0]
+
+        pm.parent(upper_pin, pin_node)
+        pm.parent(lower_pin, pin_node)
+
+        pm.move(*offset_up, upper_pin, relative=True, objectSpace=True)
+        pm.move(*offset_low, lower_pin, relative=True, objectSpace=True)
+
         for curve_point in curve_points:
             decompose_matrix = pm.createNode("decomposeMatrix", name=f"{pin_node}_{curve_point}_dcmp")
+            upper_decompose_matrix = pm.createNode("decomposeMatrix", name=f"{pin_node}_{curve_point}_up_dcmp")
+            lower_decompose_matrix = pm.createNode("decomposeMatrix", name=f"{pin_node}_{curve_point}_low_dcmp")
+
             pm.connectAttr(
-                f"{pin_node}.worldMatrix[0]", f"{decompose_matrix}.inputMatrix", f=True
+                f"{pin_node}.worldMatrix[0]",
+                f"{decompose_matrix}.inputMatrix", f=True
             )
             pm.connectAttr(
-                f"{decompose_matrix}.outputTranslate", f"{bezier_curve}.controlPoints[{curve_point}]", f=True
+                f"{upper_pin}.worldMatrix[0]",
+                f"{upper_decompose_matrix}.inputMatrix", f=True
+            )
+            pm.connectAttr(
+                f"{lower_pin}.worldMatrix[0]",
+                f"{lower_decompose_matrix}.inputMatrix", f=True
+            )
+
+            pm.connectAttr(
+                f"{decompose_matrix}.outputTranslate",
+                f"{bezier_curve}.controlPoints[{curve_point}]", f=True
+            )
+            pm.connectAttr(
+                f"{upper_decompose_matrix}.outputTranslate",
+                f"{up_curve}.controlPoints[{curve_point}]", f=True
+            )
+            pm.connectAttr(
+                f"{lower_decompose_matrix}.outputTranslate",
+                f"{low_curve}.controlPoints[{curve_point}]", f=True
             )
 
     constrain_tangent(jnt_chain, name, tangent_null)
 
-    ribbon = None
-    return ribbon
+    lofted_surface = pm.loft(
+        bezier_curve, up_curve, low_curve,
+        ch=1, u=1, c=0, ar=1, d=3, ss=1, rn=0, po=0, rsn=True
+    )
+
+    pm.parent(lofted_surface, parent_group)
+
+    return lofted_surface
 
 
 def constrain_tangent(jnt_chain, name, tangent_null):
