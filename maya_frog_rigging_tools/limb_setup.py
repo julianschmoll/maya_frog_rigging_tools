@@ -649,9 +649,11 @@ class LimbSetup:
 
     def _setup_ribbon(self):
         self.log.info("Setting up Ribbon")
-
+        host_component = next((value for value in self.ctl_data.values() if value['subcomponent'] == 'host'), None)
+        host_node = host_component.get("node")
         bezier_ribbon = ribbon.create_bezier_ribbon(
             self.root_chain,
+            host_node,
             name=f"{self.prefix}_rbbn"
         )
 

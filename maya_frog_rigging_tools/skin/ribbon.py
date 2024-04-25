@@ -3,6 +3,10 @@ import pymel.core as pm
 from maya_frog_rigging_tools import control
 from maya_frog_rigging_tools import utils
 
+import logging
+
+LOGGER = logging.getLogger("Ribbon")
+
 
 def add_pins_to_ribbon(ribbon, number_of_pins):
     param_length_u = ribbon.getShape().minMaxRangeU.get()
@@ -16,7 +20,9 @@ def add_pins_to_ribbon(ribbon, number_of_pins):
     return pin_list
 
 
-def create_bezier_ribbon(jnt_chain, offset_up=(0, 0, 1), offset_low=(0, 0, -1), name="bezier_rbbn"):
+def create_bezier_ribbon(
+        jnt_chain, host_node, prim_axis="x", offset_up=(0, 0, 1), offset_low=(0, 0, -1), name="bezier_rbbn"
+):
     pins = {
         "start_pin": {"parent": jnt_chain[0], "curve_points": [0, 1]},
         "end_pin": {"parent": jnt_chain[-1], "curve_points": [5, 6]},
@@ -100,16 +106,49 @@ def create_bezier_ribbon(jnt_chain, offset_up=(0, 0, 1), offset_low=(0, 0, -1), 
                 f"{low_curve}.controlPoints[{curve_point}]", f=True
             )
 
-    constrain_tangent(jnt_chain, name, tangent_null)
+    tangent = constrain_tangent(jnt_chain, name, tangent_null)
 
     lofted_surface = pm.loft(
         bezier_curve, up_curve, low_curve,
-        ch=1, u=1, c=0, ar=1, d=3, ss=1, rn=0, po=0, rsn=True
+        ch=1, u=1, c=0, ar=1, d=3, ss=1, rn=0, po=0, rsn=True, name=name
     )
 
     pm.parent(lofted_surface, parent_group)
 
-    return lofted_surface
+    LOGGER.info(f"Created {lofted_surface}")
+
+    pm.addAttr(
+        host_node,
+        longName="roundness",
+        attributeType='float',
+        minValue=0,
+        maxValue=2,
+        defaultValue=0,
+        keyable=True
+    )
+    pm.addAttr(
+        host_node,
+        longName="roundTangent",
+        attributeType='float',
+        minValue=0,
+        maxValue=1,
+        defaultValue=0.5,
+        keyable=True
+    )
+
+    pm.connectAttr(
+        f"{host_node}.roundness",
+        f"{tangent_null}.scale.scale{prim_axis.upper()}",
+        force=True
+    )
+
+    pm.connectAttr(
+        f"{host_node}.roundTangent",
+        f"{tangent}.blender",
+        force=True
+    )
+
+    return lofted_surface[0]
 
 
 def constrain_tangent(jnt_chain, name, tangent_null):
@@ -132,6 +171,7 @@ def constrain_tangent(jnt_chain, name, tangent_null):
     pm.connectAttr(
         f"{blend_rotation}.output", f"{tangent_null}.rotate", f=True
     )
+    return blend_rotation
 
 
 def get_bezier_points(joints):
@@ -171,7 +211,7 @@ def pin_to_surface(nurbs_surface, u_pos=0.5, v_pos=0.5, name_suf="#"):
     pin_locator.parameterV.connect(point_on_surface.parameterV)
 
     mtx = pm.createNode("fourByFourMatrix", name=f"{pin_name}_mtx")
-    out_matrix = pm.createNode("decomposeMatrix", name=f"{pin_name}_dcmtx")
+    out_matrix = pm.createNode("decomposeMatrix", name=f"{pin_name}_dcmp")
     mtx.output.connect(out_matrix.inputMatrix)
     out_matrix.outputTranslate.connect(pin_locator.getTransform().translate)
     out_matrix.outputRotate.connect(pin_locator.getTransform().rotate)
