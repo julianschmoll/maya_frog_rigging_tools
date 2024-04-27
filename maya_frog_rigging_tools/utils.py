@@ -2,8 +2,6 @@ from pathlib import Path
 import logging
 from pymel import core as pm
 
-from maya_frog_rigging_tools.limb_setup import LOGGER
-
 LOGGER = logging.getLogger("Rigging Utils")
 
 
