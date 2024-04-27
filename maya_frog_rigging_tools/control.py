@@ -1,4 +1,4 @@
-from ._control import utils as ctl_utils
+from ._control import json_control
 import os
 import logging
 
@@ -13,4 +13,4 @@ def create(ctl_type, name="ctl", size=1):
     json_path = os.path.join(json_dir, f"{ctl_type}.json")
     if json_path:
         LOGGER.info(f"Creating {ctl_type} control from json")
-        return ctl_utils.create_ctl_from_json(json_path, name, ctl_size=size)
+        return json_control.create_ctl_from_json(json_path, name, ctl_size=size)
