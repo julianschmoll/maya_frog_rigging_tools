@@ -2,17 +2,13 @@ from pathlib import Path
 import logging
 from pymel import core as pm
 
+from maya_frog_rigging_tools.limb_setup import LOGGER
+
 LOGGER = logging.getLogger("Rigging Utils")
 
 
 def get_project_root():
     return Path(__file__).parent.parent
-
-
-def match_transforms(source_obj, target_obj, **kwargs):
-    LOGGER.info(f"Matching transforms of {source_obj} to {target_obj}")
-    constraint = pm.parentConstraint(source_obj, target_obj, **kwargs)
-    pm.delete(constraint)
 
 
 def align_center(obj1, obj2, obj3):
@@ -43,3 +39,9 @@ def get_center(translations):
     center_z = z_sum / num_translations
 
     return center_x, center_y, center_z
+
+
+def match_transforms(source_obj, target_obj, **kwargs):
+    LOGGER.info(f"Matching transforms of {source_obj} to {target_obj}")
+    constraint = pm.parentConstraint(source_obj, target_obj, **kwargs)
+    pm.delete(constraint)

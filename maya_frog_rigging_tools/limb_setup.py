@@ -6,6 +6,7 @@ from pymel.core.nodetypes import DependNode
 
 from maya_frog_rigging_tools import control
 from maya_frog_rigging_tools.skin import ribbon
+from maya_frog_rigging_tools.utils import match_transforms
 
 BND_PATTERN = "_bnd"
 LOGGER = logging.getLogger("Rigging Utils")
@@ -747,12 +748,6 @@ def get_child_joints_in_order(root_joint):
     traverse_hierarchy(root_joint)
 
     return child_joints
-
-
-def match_transforms(source_obj, target_obj, **kwargs):
-    LOGGER.info(f"Matching transforms of {source_obj} to {target_obj}")
-    constraint = pm.parentConstraint(source_obj, target_obj, **kwargs)
-    pm.delete(constraint)
 
 
 def calculate_pole_vector_position(joint_chain, pole_distance=1):
