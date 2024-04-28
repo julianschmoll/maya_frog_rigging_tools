@@ -5,14 +5,6 @@ import pymel.core as pm
 
 
 def get_deform_shape(ob):
-	"""
-	Gets the visible geometry shape regardless of whether or not
-	the object is deformed or not.
-
-	:param ob: The object to check.
-	:returns: The object's deform shape.
-	"""
-
 	ob = pm.PyNode(ob)
 	if ob.type() in ['nurbsSurface', 'mesh', 'nurbsCurve']:
 		ob = ob.getParent()
@@ -48,6 +40,7 @@ def log(msg, warn=False, error=False):
 def get_mobject(name):
 	sel = om2.MGlobal.getSelectionListByName(name)
 	return sel.getDependNode(0)
+
 
 def get_dag_path(name):
 	sel = om2.MGlobal.getSelectionListByName(name)
@@ -87,7 +80,6 @@ def move_skin(source, target):
 	pm.select(cl=True)
 	target_skin = pm.deformer(target, type='skinCluster', n='MERGED__' + source_skin.name())[0]
 
-	## copy over input values / connections
 	bind_inputs = [(x.inputs(plugs=True)[0] if x.isConnected() else None) for x in source_skin.bindPreMatrix]
 	bind_values = [x.get() for x in source_skin.bindPreMatrix]
 	mat_inputs = [(x.inputs(plugs=True)[0] if x.isConnected() else None) for x in source_skin.matrix]
@@ -103,7 +95,6 @@ def move_skin(source, target):
 		if mat_input:
 			mat_input >> target_skin.matrix[index]
 
-	## copy over weights
 	target_mfn = get_mfn_skin(target_skin)
 	target_mesh = get_mfn_mesh(get_deform_shape(target))
 	target_dp = get_dag_path(get_deform_shape(target).longName())
