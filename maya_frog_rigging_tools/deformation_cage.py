@@ -39,28 +39,6 @@ def create_deform_cage(mesh_name, t_pose_objs, ctl_size=1, smooth_iterations=2):
 
         bnd_jnts = get_bound_joints(mesh_name, vert_num)
 
-        # if len(bnd_jnts) > 1:
-
-        #     wt_add_matrix = pm.createNode('wtAddMatrix', name=f"{orig_group}_wtAddMatrix")
-
-        #     for index in range(len(bnd_jnts)):
-        #         jnt, jnt_weight = bnd_jnts[index]
-            
-        #         mult_matrix = pm.createNode('multMatrix', name=f"{jnt}_{wt_add_matrix}_mm")
-
-        #         jnt.worldMatrix[0].connect(mult_matrix.matrixIn[0])
-        #         cage_ctl_group.worldInverseMatrix[0].connect(mult_matrix.matrixIn[1])
-
-        #         mult_matrix.matrixSum.connect(wt_add_matrix.wtMatrix[index].matrixIn)
-        #         wt_add_matrix.wtMatrix[index].weightIn.set(jnt_weight)
-    
-        #     wt_add_matrix.matrixSum.connect(orig_group.offsetParentMatrix)
-        # else:
-        #     jnt, jnt_weight = bnd_jnts[0]
-        #     jnt.worldMatrix[0].connect(orig_group.offsetParentMatrix)
-
-        if not len(bnd_jnts) < 3:
-            raise ValueError(f"{vert_name} is connected to more than two points")
         if len(bnd_jnts) == 2:
             jnt1, jnt1_weight = bnd_jnts[0]
             jnt2, jnt2_weight = bnd_jnts[1]
@@ -80,6 +58,21 @@ def create_deform_cage(mesh_name, t_pose_objs, ctl_size=1, smooth_iterations=2):
 
             blend.envelope.set(jnt2_weight)
             blend.outputMatrix.connect(orig_group.offsetParentMatrix)
+        elif len(bnd_jnts) > 2:
+            wt_add_matrix = pm.createNode('wtAddMatrix', name=f"{orig_group}_wtAddMatrix")
+
+            for bnd_idx in range(len(bnd_jnts)):
+                jnt, jnt_weight = bnd_jnts[bnd_idx]
+
+                mult_matrix = pm.createNode('multMatrix', name=f"{jnt}_{wt_add_matrix}_mm")
+
+                jnt.worldMatrix[0].connect(mult_matrix.matrixIn[0])
+                cage_ctl_group.worldInverseMatrix[0].connect(mult_matrix.matrixIn[1])
+
+                mult_matrix.matrixSum.connect(wt_add_matrix.wtMatrix[bnd_idx].matrixIn)
+                wt_add_matrix.wtMatrix[bnd_idx].weightIn.set(jnt_weight)
+
+            wt_add_matrix.matrixSum.connect(orig_group.offsetParentMatrix)
         else:
             jnt, jnt_weight = bnd_jnts[0]
             jnt.worldMatrix[0].connect(orig_group.offsetParentMatrix)
