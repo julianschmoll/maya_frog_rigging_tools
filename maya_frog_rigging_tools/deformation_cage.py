@@ -467,8 +467,7 @@ def smoothSkinCluster(polyMesh, intensity=0.5, itterations=30):
     settings.mode = ngst.PaintMode.smooth
     settings.intensity = intensity
     settings.iterations = itterations
-    
-    
+
     ngst.flood_weights(target=layer, settings=settings)
 
     try:
