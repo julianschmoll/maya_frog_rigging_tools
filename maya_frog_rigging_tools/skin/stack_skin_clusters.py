@@ -1,7 +1,7 @@
 
 from maya.api import OpenMaya as om2
 from maya.api import OpenMayaAnim as oma2
-import pymel.core as pm
+from pymel import core as pm
 
 
 def get_deform_shape(ob):
