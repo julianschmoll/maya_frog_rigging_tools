@@ -6,15 +6,16 @@ def create_eye(name, iris=False, subdiv_res=20):
     sphere = pm.polySphere(n=f"{name}_blend", ax=(1, 0, 0), subdivisionsX=subdiv_res*2, subdivisionsY=subdiv_res*2)[0]
     ctl = pm.circle(name=f"{name}_ctl", radius=2, normal=(1, 0, 0))[0]
 
-    pm.addAttr(
-        ctl,
-        longName="Iris",
-        attributeType='float',
-        minValue=0,
-        maxValue=1,
-        defaultValue=0.5,
-        keyable=True
-    )
+    if iris:
+        pm.addAttr(
+            ctl,
+            longName="Iris",
+            attributeType='float',
+            minValue=0,
+            maxValue=1,
+            defaultValue=0.5,
+            keyable=True
+        )
 
     pm.addAttr(
         ctl,
@@ -41,7 +42,7 @@ def create_eye(name, iris=False, subdiv_res=20):
         quat = pm.createNode("eulerToQuat", n=f"{name}_{i}_quat")
         clamp = pm.createNode("clamp", n=f"{name}_{i}_clamp")
 
-        if i < pupil_edge:
+        if i < pupil_edge and iris:
             pm.connectAttr(ctl + ".Iris", remap + ".inputValue")
         else:
             pm.connectAttr(ctl + ".Pupil", remap + ".inputValue")
