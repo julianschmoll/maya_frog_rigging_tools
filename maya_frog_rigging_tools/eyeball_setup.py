@@ -2,10 +2,9 @@ from pymel import core as pm
 import numpy as np
 
 
-def create_eye(name):
-    sphere = pm.polySphere(n=name, ax=(1, 0, 0))[0]
+def create_eye(name, iris=False, subdiv_res=20):
+    sphere = pm.polySphere(n=f"{name}_blend", ax=(1, 0, 0), subdivisionsX=subdiv_res*2, subdivisionsY=subdiv_res*2)[0]
     ctl = pm.circle(name=f"{name}_ctl", radius=2, normal=(1, 0, 0))[0]
-    pm.polySmooth(sphere, method=0, divisions=1)
 
     pm.addAttr(
         ctl,
@@ -28,7 +27,7 @@ def create_eye(name):
     )
 
     jnt_list = []
-    value_list = get_value_list(21)
+    value_list = get_value_list(subdiv_res + 1)
     value_list.reverse()
 
     pupil_edge = 16
@@ -69,6 +68,10 @@ def create_eye(name):
 
         jnt_list.append(joint)
 
+    jnt_grp = pm.group(jnt_list, name=f"{name}_bnd")
+    pm.group(jnt_grp, sphere, ctl, name=name)
+    # this is currently not what we want as every
+    # joint should have 100% influence for according edge loop
     pm.skinCluster(sphere, jnt_list)
 
 
