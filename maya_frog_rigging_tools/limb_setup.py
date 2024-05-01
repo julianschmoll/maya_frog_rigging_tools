@@ -8,12 +8,20 @@ from maya_frog_rigging_tools import control
 from maya_frog_rigging_tools.skin import ribbon
 from maya_frog_rigging_tools.utils import match_transforms
 
-BND_PATTERN = "_bnd"
 LOGGER = logging.getLogger("Rigging Utils")
 
 
 class LimbSetup:
-    def __init__(self, root_bnd, prefix_name="limb", primary_axis="x", secondary_axis="y", up_axis="z", ctl_scale=1):
+    def __init__(
+            self,
+            root_bnd,
+            prefix_name="limb",
+            primary_axis="x",
+            secondary_axis="y",
+            up_axis="z",
+            ctl_scale=1,
+            bnd_pattern="_bnd"
+    ):
         self.log = logging.getLogger("Limb Setup")
         self.log.info("Initializing LimbSetup")
         self.primary_axis = primary_axis
@@ -22,6 +30,7 @@ class LimbSetup:
         self.ctl_scale = ctl_scale
         self.root = root_bnd
         self.prefix = prefix_name
+        self.bnd_pattern = bnd_pattern
 
     def build_structure(self):
         self.log.info("Building Joint Structure")
@@ -48,17 +57,17 @@ class LimbSetup:
             )
         self.fk_chain = get_child_joints_in_order(
             duplicate_and_rename_hierarchy(
-                self.root, BND_PATTERN, "_fk"
+                self.root, self.bnd_pattern, "_fk"
             )[0]
         )
         self.ik_chain = get_child_joints_in_order(
             duplicate_and_rename_hierarchy(
-                self.root, BND_PATTERN, "_ik"
+                self.root, self.bnd_pattern, "_ik"
             )[0]
         )
         self.stretch_chain = get_child_joints_in_order(
             duplicate_and_rename_hierarchy(
-                self.root, BND_PATTERN, "_stretch"
+                self.root, self.bnd_pattern, "_stretch"
             )[0]
         )
         self.jnt_grp = pm.group(self.fk_chain[0], self.ik_chain[0], self.stretch_chain[0], name=f"{self.prefix}")
