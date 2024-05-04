@@ -2,11 +2,17 @@ from pymel import core as pm
 import numpy as np
 
 
-def create_eye(name, iris=False, subdiv_res=20):
-    sphere = pm.polySphere(n=f"{name}_blend", ax=(1, 0, 0), subdivisionsX=subdiv_res*2, subdivisionsY=subdiv_res*2)[0]
+def setup_eye(name, iris_exists=False, pupil_edge=10, subdiv_res=20, axis="x", input_geo=None):
+    if not input_geo:
+        input_geo = pm.polySphere(
+            n=f"{name}_blend",
+            ax=(1, 0, 0),
+            subdivisionsX=subdiv_res*2,
+            subdivisionsY=subdiv_res*2
+        )[0]
     ctl = pm.circle(name=f"{name}_ctl", radius=2, normal=(1, 0, 0))[0]
 
-    if iris:
+    if iris_exists:
         pm.addAttr(
             ctl,
             longName="Iris",
@@ -31,30 +37,31 @@ def create_eye(name, iris=False, subdiv_res=20):
     value_list = get_value_list(subdiv_res + 1)
     value_list.reverse()
 
-    pupil_edge = 16
+    for index, val in enumerate(value_list):
+        joint = pm.joint(n=f"{name}_{index}_bnd")
 
-    for i, val in enumerate(value_list):
-        pm.select(cl=1)
-        joint = pm.joint(n=f"{name}_{i}_bnd")
+        remap = pm.createNode("remapValue", n=f"{name}_{index}_remap")
+        mult = pm.createNode("multiplyDivide", n=f"{name}_{index}_mult")
+        quat = pm.createNode("eulerToQuat", n=f"{name}_{index}_quat")
+        clamp = pm.createNode("clamp", n=f"{name}_{index}_clamp")
 
-        remap = pm.createNode("remapValue", n=f"{name}_{i}_remap")
-        mult = pm.createNode("multiplyDivide", n=f"{name}_{i}_mult")
-        quat = pm.createNode("eulerToQuat", n=f"{name}_{i}_quat")
-        clamp = pm.createNode("clamp", n=f"{name}_{i}_clamp")
-
-        if i < pupil_edge and iris:
+        if index < pupil_edge and iris_exists:
             pm.connectAttr(ctl + ".Iris", remap + ".inputValue")
         else:
             pm.connectAttr(ctl + ".Pupil", remap + ".inputValue")
+
         pm.connectAttr(remap + ".outValue", mult + ".input1X")
         pm.connectAttr(mult + ".outputX", quat + ".inputRotateX")
-        pm.connectAttr(quat + ".outputQuatX", joint + ".translateX")
+
+        pm.connectAttr(quat + ".outputQuatX", joint + ".translate" + axis.upper())
 
         pm.connectAttr(quat + ".outputQuatW", clamp + ".inputR")
+
+        pm.connectAttr(clamp + ".output.outputR", joint + ".scaleX")
         pm.connectAttr(clamp + ".output.outputR", joint + ".scaleY")
         pm.connectAttr(clamp + ".output.outputR", joint + ".scaleZ")
 
-        pm.setAttr(remap + ".outputMin", float(i) / (len(value_list)-1))
+        pm.setAttr(remap + ".outputMin", float(index) / (len(value_list)-1))
         pm.setAttr(remap + ".outputMax", 0)
         pm.setAttr(mult + ".input2X", 180)
         pm.setAttr(clamp + ".maxR", 1000)
@@ -70,10 +77,11 @@ def create_eye(name, iris=False, subdiv_res=20):
         jnt_list.append(joint)
 
     jnt_grp = pm.group(jnt_list, name=f"{name}_bnd")
-    pm.group(jnt_grp, sphere, ctl, name=name)
+    pm.group(jnt_grp, input_geo, ctl, name=name)
+
     # this is currently not what we want as every
     # joint should have 100% influence for according edge loop
-    pm.skinCluster(sphere, jnt_list)
+    pm.skinCluster(input_geo, jnt_list)
 
 
 def get_value_list(length):
@@ -86,4 +94,4 @@ def get_value_list(length):
     return list(y_values)
 
 
-# usage: create_eye("eye")
+# usage: setup_eye("eye")
