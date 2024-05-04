@@ -142,6 +142,9 @@ def create_bezier_ribbon(
         force=True
     )
 
+    # ToDo: tangents need to be updated in code, since this could be easily fixed by hand
+    # I didn't adjust it in code yet, see picture in resources/node_tree/fix_flipping_tangent.png
+    # for later implementation
     pm.connectAttr(
         f"{host_node}.roundTangent",
         f"{tangent}.blender",
