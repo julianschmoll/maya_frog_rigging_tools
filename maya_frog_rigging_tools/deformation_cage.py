@@ -1,7 +1,9 @@
 from maya import cmds
 from maya import OpenMaya as om
+import maya.api.OpenMaya as om2
 import logging
 import pymel.core as pm
+import math
 
 
 logger = logging.getLogger("Deformation Cage")
@@ -81,8 +83,7 @@ def create_deform_cage(mesh_name, t_pose_objs, ctl_size=1, smooth_iterations=2):
         orig_group.setTranslation(vert_position, space="world")
         orig_group.setRotation(vert_position, space="world")
 
-        normal = input_mesh.getVertexNormal(vert_num, space='world', angleWeighted=True)
-        orient_along_normal(srt_group, normal)
+        orient_along_vertex_normal(srt_group, input_mesh, vert_num)
 
         for attr in ["scaleX", "scaleY", "scaleZ", "rotateX", "rotateY", "rotateZ"]:
             cmds.setAttr(f"{str(curve_sphere)}.{attr}", keyable = False, cb = False, lock = True)
@@ -190,18 +191,21 @@ def colorize(transform, color=None):
         shape.setAttr(color_attribute, color)
 
 
-def orient_along_normal(srt_group, normal):
-    x_axis = normal.cross(pm.datatypes.Vector(0, 1, 0)).normal()
-    y_axis = normal
-    z_axis = x_axis.cross(y_axis)
-    rotation_matrix = [
-        x_axis.x, x_axis.y, x_axis.z, 0,
-        y_axis.x, y_axis.y, y_axis.z, 0,
-        z_axis.x, z_axis.y, z_axis.z, 0,
-        0, 0, 0, 1
-    ]
+def orient_along_vertex_normal(target_object, input_mesh, vert_number):
+    normal = input_mesh.getVertexNormal(vert_number, space='world', angleWeighted=True)
+    vtx_matrix = om2.MMatrix(
+        (
+            normal.x, normal.y, normal.z, 0,
+            0, 1, 0, 0,
+            0, 0, 1, 0,
+            0, 0, 0, 1,
+        )
+    )
+    vtx_transform_matrix = om2.MTransformationMatrix(vtx_matrix)
+    radians = vtx_transform_matrix.rotation(asQuaternion=False)
+    rotation = [rad * 180 / math.pi for rad in radians]
 
-    pm.xform(srt_group, matrix=rotation_matrix)
+    pm.rotate(target_object, rotation, worldSpace=True)
 
 
 def get_bound_joints(mesh, vert_num):
