@@ -108,10 +108,7 @@ def create_deform_cage(mesh_name, t_pose_objs, ctl_size=1, smooth_iterations=2):
         )
         copy_skin_weights(smoothed, t_pose_mesh)
         logger.info("Copied Skin Weights")
-        try:
-            smoothSkinCluster(t_pose_mesh, intensity=0.7, itterations=smooth_iterations*10)
-        except:
-            logger.warning("Failed to smooth Skin Weights")
+        smooth_skin_cluster(t_pose_mesh, intensity=0.7, iterations=smooth_iterations * 10)
         for index in range(len(jnt_list)):
             bpm_jnt = jnt_list[index][1]
             cmds.connectAttr(
@@ -421,58 +418,34 @@ def create_curve(
     return curve
 
 
-def smoothSkinCluster(polyMesh, intensity=0.5, itterations=30):
-    """
-    Try to import Ngskintools and smooth the skin cluster
-
-    :param polyMesh: name of the poly mesh to smooth
-    :param intensity: set the intensity of the smooth value
-    :param itterations: number of times to run the smooth
-    :return:
-    """
+def smooth_skin_cluster(poly_mesh, intensity=1, iterations=3):
     try:
-        pluginLoaded = cmds.pluginInfo("ngSkinTools2", q=True, loaded=True)
-        if not pluginLoaded:
+        plugin_loaded = cmds.pluginInfo("ngSkinTools2", q=True, loaded=True)
+        if not plugin_loaded:
             cmds.loadPlugin("ngSkinTools2")
         from ngSkinTools2 import api as ngst
     except:
         raise Warning(
             "Unable to load ngSkinTools2 python module. Cannot smooth mesh {}".format(
-                polyMesh
+                poly_mesh
             )
         )
-    # we need a layer reference for this, so we'll take first layer from our sample mesh
-    try:
-        ngst.init_layers(polyMesh)
-        layers = ngst.Layers(polyMesh)
-    except:
-        try:
-            layers = ngst.Layers(polyMesh)
-        except:
-            om.MGlobal.displayWarning("Failed to initialize skinning layers")
+    ngst.init_layers(poly_mesh.name())
+    layers = ngst.Layers(poly_mesh.name())
+
     if not layers.list():
-        layer = layers.add("base_weights")
+        logger.info("adding base weights layer")
+        layer = layers.add("smoothed_cage")
     else:
         layer = layers.list()[0]
 
-    # build settings for the flood
-    
     settings = ngst.PaintModeSettings()
 
-    # smoothing does not require current influence
-    
     settings.mode = ngst.PaintMode.smooth
     settings.intensity = intensity
-    settings.iterations = itterations
+    settings.iterations = iterations*500
 
     ngst.flood_weights(target=layer, settings=settings)
-
-    try:
-        skinClusterNode = pm.ls( pm.listHistory( polyMesh ), type='skinCluster')[0]
-        ngSkinNodes = cmds.listConnections(str(skinClusterNode), type="ngst2SkinLayerData")
-        cmds.delete(ngSkinNodes)
-    except:
-        om.MGlobal.displayWarning("Failed to delete ngst2SkinLayerData")
 
 
 def create(cage, bind_skin, ctl_size=1, smooth_iterations=2):
