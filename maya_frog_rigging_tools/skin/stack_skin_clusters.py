@@ -1,27 +1,9 @@
 
 from maya.api import OpenMaya as om2
-from maya.api import OpenMayaAnim as oma2
 from pymel import core as pm
 
-
-def get_deform_shape(ob):
-	ob = pm.PyNode(ob)
-	if ob.type() in ['nurbsSurface', 'mesh', 'nurbsCurve']:
-		ob = ob.getParent()
-	shapes = pm.PyNode(ob).getShapes()
-	if len(shapes) == 1:
-		return(shapes[0])
-	else:
-		real_shapes = [ x for x in shapes if not x.intermediateObject.get() ]
-		return(real_shapes[0] if len(real_shapes) else None)
-
-
-def get_skin_cluster(ob):
-	shape = get_deform_shape(ob)
-	if shape is None:
-		return(None)
-	skins = pm.ls(pm.listHistory(shape), type='skinCluster')
-	return(skins[0])
+from maya_frog_rigging_tools.omaya_utils import get_dag_path, get_mfn_skin, get_mfn_mesh, get_complete_components
+from maya_frog_rigging_tools.skin.skin_utils import get_deform_shape, get_skin_cluster
 
 
 def log(msg, warn=False, error=False):
@@ -35,36 +17,6 @@ def log(msg, warn=False, error=False):
 		log_func = om2.MGlobal.displayError
 
 	log_func(msg)
-
-
-def get_mobject(name):
-	sel = om2.MGlobal.getSelectionListByName(name)
-	return sel.getDependNode(0)
-
-
-def get_dag_path(name):
-	sel = om2.MGlobal.getSelectionListByName(name)
-	return sel.getDagPath(0)
-
-
-def get_mfn_skin(skin_ob):
-	if isinstance(skin_ob, pm.PyNode):
-		skin_ob = get_mobject(skin_ob.longName())
-	return oma2.MFnSkinCluster(skin_ob)
-
-
-def get_mfn_mesh(mesh_ob):
-	if isinstance(mesh_ob, pm.PyNode):
-		mesh_ob = get_mobject(mesh_ob.longName())
-	return om2.MFnMesh(mesh_ob)
-
-
-def get_complete_components(mesh_ob):
-	assert(isinstance(mesh_ob, om2.MFnMesh))
-	comp = om2.MFnSingleIndexedComponent()
-	ob = comp.create(om2.MFn.kMeshVertComponent)
-	comp.setCompleteData(mesh_ob.numVertices)
-	return(ob)
 
 
 def move_skin(source, target):
