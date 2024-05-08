@@ -1,3 +1,5 @@
+from pymel import core as pm
+
 def get_deform_shape(ob):
 	ob = pm.PyNode(ob)
 	if ob.type() in ['nurbsSurface', 'mesh', 'nurbsCurve']:
