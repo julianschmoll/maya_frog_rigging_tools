@@ -1,4 +1,5 @@
 from maya import cmds
+from maya_frog_rigging_tools import omaya_utils
 
 # followed tutorial by Marco Giordano
 
@@ -23,17 +24,18 @@ for s in sel:
     pos = cmds.xform(s, q=1, ws=1, t=1)
     cmds.xform(loc, ws=1, t=pos)
     par = cmds.listRelatives(s, p=1)[0]
-    cmds.aimConstraint(loc, par, mo=1, weight=1, aimVector=(1, 0, 0), upVector=(0, 1, 0), worldUpType="object",
-                       worldUpObject="eye_l_up")
+    cmds.aimConstraint(
+        loc, par, mo=1, weight=1, aimVector=(1, 0, 0), upVector=(0, 1, 0), worldUpType="object",worldUpObject="eye_l_up"
+    )
 
-# create a cv curve qconnecting all top and bottom locs
+# create a cv curve connecting all top and bottom locs
 
 sel = cmds.ls(sl=1)
 crv = "eye_l_lower_curveShape"
 
 for s in sel:
     pos = cmds.xform(s, q=1, ws=1, t=1)
-    u_parm = get_u_param(pos, crv)
+    u_parm = omaya_utils.get_u_param(pos, crv)
     name = s.replace("_loc", "_pci")
     pci = cmds.createNode("pointOnCurveInfo", name=name)
     cmds.connectAttr(f"{crv}.worldSpace", f"{pci}.inputCurve")
