@@ -1,23 +1,30 @@
 from maya import cmds
+from pymel import core as pm
 from maya_frog_rigging_tools import omaya_utils
 
 # followed tutorial by Marco Giordano
+vtx = cmds.ls(sl=10, fl=1)
+prefix = "eye_l_lower"
+center = pm.PyNode("head_bnd|eye_l_bnd").fullPath()
+
 
 # create joints
-for v in vtx:
+for i, v in enumerate(vtx):
     cmds.select(cl=1)
-    jnt = cmds.joint(name=f"eye_l_upper_{v}bnd")
+    jnt = cmds.joint(name=f"{prefix}_{i}_bnd")
     pos = cmds.xform(v, q=1, ws=1, t=1)
     cmds.xform(jnt, ws=1, t=pos)
     center_position = cmds.xform(center, q=1, ws=1, t=1)
     cmds.select(cl=1)
-    center_joint = cmds.joint(name=f"eye_l_upper_{v}center")
+    center_joint = cmds.joint(name=f"{prefix}_{i}_center")
     cmds.xform(center_joint, ws=1, t=center_position)
     cmds.parent(jnt, center_joint)
     cmds.joint(center_joint, e=1, oj="xyz", secondaryAxisOrient="yup", ch=1, zso=1)
 
 # select joint tips(bnd)and create aim constraints
+# create up vectors as well (locators above eyes)
 sel = cmds.ls(sl=1)
+up = "eye_r_up"
 
 for s in sel:
     loc = cmds.spaceLocator(name=f"{s}_loc")[0]
@@ -25,13 +32,14 @@ for s in sel:
     cmds.xform(loc, ws=1, t=pos)
     par = cmds.listRelatives(s, p=1)[0]
     cmds.aimConstraint(
-        loc, par, mo=1, weight=1, aimVector=(1, 0, 0), upVector=(0, 1, 0), worldUpType="object",worldUpObject="eye_l_up"
+        loc, par, mo=1, weight=1, aimVector=(1, 0, 0), upVector=(0, 1, 0), worldUpType="object",worldUpObject=up
     )
 
-# create a cv curve connecting all top and bottom locs
-
+# create a cv curve (linear) connecting all top or bottom locs
+# with the following function, locators will follow curve
+# selection has to be locators
 sel = cmds.ls(sl=1)
-crv = "eye_l_lower_curveShape"
+crv = "eye_r_lower_aim_curveShape"
 
 for s in sel:
     pos = cmds.xform(s, q=1, ws=1, t=1)
