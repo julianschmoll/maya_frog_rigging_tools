@@ -452,3 +452,18 @@ def create(cage, bind_skin, ctl_size=1, smooth_iterations=2):
     create_deform_cage(
         cage, bind_skin, ctl_size=ctl_size, smooth_iterations=smooth_iterations
     )
+
+
+def connect_bpm_joints(skin_cluster):
+    logger.info("Searching for bpm joints and connecting them")
+    for influence in skin_cluster.influenceObjects():
+        index = skin_cluster.indexForInfluenceObject(influence)
+        bpm_joint_name = influence.name().replace("_bnd", "_bpm")
+        if pm.objExists(bpm_joint_name):
+            bpm_joint = pm.PyNode(bpm_joint_name)
+            logger.info(
+                f"Connecting {bpm_joint}.worldInverseMatrix[0] to {skin_cluster}.bindPreMatrix[{index}]..."
+            )
+            pm.connectAttr(f"{bpm_joint}.worldInverseMatrix[0]", f"{skin_cluster}.bindPreMatrix[{index}]")
+        else:
+            logger.warning(f"Could not find bpm joint for {influence}")
