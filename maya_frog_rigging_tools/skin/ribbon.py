@@ -27,10 +27,10 @@ def add_pin_joints(ribbon_node=None, number_of_pins=10):
         pm.makeIdentity(jnt, apply=True, t=0, r=1, s=0, n=0, pn=True)
         pm.parent(jnt, pin)
         pm.xform(jnt, translation=(0, 0, 0))
-        pm.group(pin_list, name=f"{ribbon_node}_pins")
         jnt_list.append(jnt)
         LOGGER.debug(f"Added {jnt} to ribbon pin {pin}")
 
+    pm.group(pin_list, name=f"{ribbon_node}_pins")
     LOGGER.info(f"Created f{len(jnt_list)} pinned joints")
     return jnt_list
 
