@@ -31,7 +31,7 @@ def add_pin_joints(ribbon_node=None, number_of_pins=10):
         LOGGER.debug(f"Added {jnt} to ribbon pin {pin}")
 
     pm.group(pin_list, name=f"{ribbon_node}_pins")
-    LOGGER.info(f"Created f{len(jnt_list)} pinned joints")
+    LOGGER.info(f"Created {len(jnt_list)} pinned joints")
     return jnt_list
 
 
