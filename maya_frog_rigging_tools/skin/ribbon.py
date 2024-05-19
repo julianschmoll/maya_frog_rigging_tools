@@ -10,6 +10,31 @@ from maya_frog_rigging_tools.skin.uv_pins import pin_on_nurbs_surface
 LOGGER = logging.getLogger("Ribbon")
 
 
+def add_pin_joints(ribbon_node=None, number_of_pins=10):
+    jnt_list = []
+
+    if not ribbon_node:
+        viewport_selection = pm.ls(sl=True)
+        if not viewport_selection:
+            raise RuntimeError("Cant create joints with not ribbon node selected.")
+        ribbon_node = viewport_selection[0]
+        LOGGER.info(f"Using {ribbon_node} as ribbon node")
+
+    pin_list = add_pins_to_ribbon(ribbon_node, number_of_pins)
+
+    for index, pin in enumerate(pin_list):
+        jnt = pm.createNode("joint", name=f"{ribbon_node}_{index}_bnd")
+        pm.makeIdentity(jnt, apply=True, t=0, r=1, s=0, n=0, pn=True)
+        pm.parent(jnt, pin)
+        pm.xform(jnt, translation=(0, 0, 0))
+        pm.group(pin_list, name=f"{ribbon_node}_pins")
+        jnt_list.append(jnt)
+        LOGGER.debug(f"Added {jnt} to ribbon pin {pin}")
+
+    LOGGER.info(f"Created f{len(jnt_list)} pinned joints")
+    return jnt_list
+
+
 def add_pins_to_ribbon(ribbon, number_of_pins):
     param_length_u = ribbon.getShape().minMaxRangeU.get()
 
