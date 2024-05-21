@@ -1,5 +1,29 @@
-import maya.cmds as cmds
-import pymel.core as pm
+from maya import cmds
+from pymel import core as pm
+
+
+def create_pin_on_vert(name=None, vert=None):
+    if not vert:
+        vert = pm.ls(sl=True, fl=True)[0]
+
+    mesh = pm.polyListComponentConversion(vert, fv=True)[0]
+    transform = pm.listRelatives(mesh, parent=True, fullPath=True)[0]
+
+    if not name:
+        name = f"{transform.split(':')[-1]}_{vert.index()}_pin"
+
+    uv_values = get_uv_values(vert)
+    pm.createNode("locator", name=f"{name}_locShape")
+    pin_loc = pm.PyNode(f"{name}_loc")
+    pin_dcmp = pm.createNode("decomposeMatrix", name=f"{name}_dcmp")
+    uv_pin_node = add_uv_pin(transform, uv_values, name=name)
+
+    pm.connectAttr(f"{uv_pin_node}.outputMatrix[0]", f"{pin_dcmp}.inputMatrix")
+    pm.connectAttr(f"{pin_dcmp}.outputTranslate", f"{pin_loc}.translate")
+
+    pm.select(pin_loc)
+
+    return pin_loc
 
 
 def get_uv_values(vert):
