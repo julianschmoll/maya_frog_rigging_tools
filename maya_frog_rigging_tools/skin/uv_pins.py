@@ -20,6 +20,8 @@ def create_pin_on_vert(name=None, vert=None):
 
     pm.connectAttr(f"{uv_pin_node}.outputMatrix[0]", f"{pin_dcmp}.inputMatrix")
     pm.connectAttr(f"{pin_dcmp}.outputTranslate", f"{pin_loc}.translate")
+    pm.connectAttr(f"{pin_dcmp}.outputRotate", f"{pin_loc}.rotate")
+    pm.connectAttr(f"{pin_dcmp}.outputScale", f"{pin_loc}.scale")
 
     pm.select(pin_loc)
 
