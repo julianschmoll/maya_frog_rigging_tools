@@ -200,7 +200,7 @@ def build_lattice(local_1_ctl_dict, main_ctl_dict, name, rig_geo, scale):
             target,
             mo=True,
             weight=1,
-            name=f"{ctl}_{target}scale_constraint"
+            name=f"{ctl}_{target}_scale_constraint"
         )
     pm.parentConstraint(
         lattice_low_dict['ctl'],
