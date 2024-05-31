@@ -79,14 +79,14 @@ def get_corner_positions(coordinates):
 
 def build_basic_rig(rig_geo=None, name=None):
     if not rig_geo:
-        rig_geo = pm.ls(sl=1)[0]
+        rig_geo = pm.ls(sl=1)
     if not name:
         if isinstance(rig_geo, list):
-            name = rig_geo[0].name().split(":")[-1]
+            name = rig_geo[0].name().split(":")[-1]  # don't consider namespace
         else:
             name = rig_geo.name().split(":")[-1]
 
-    # this should be a class later, doing this for speed now
+    # ToDo: This should be a class later, doing those for speed now
     local_0_ctl_dict, local_1_ctl_dict, main_ctl_dict, main_ctl_grp, scale = build_main_ctl(name, rig_geo)
 
     lattice_base, lattice_low_dict, lattice_mid_dict, lattice_shape, lattice_upper_dict, low_grp, mid_grp, up_grp = build_lattice(
