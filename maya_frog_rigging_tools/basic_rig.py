@@ -1,7 +1,6 @@
 from pymel import core as pm
 from capito.maya.rig.icons import RigIcons
 from maya_frog_rigging_tools import utils as rig_utils
-from maya_frog_menu import asset
 
 
 def create_ctl_structure(index, name, match_bb=None, scale=None, freeze_transforms=True, color_index=2):
@@ -109,31 +108,47 @@ def build_basic_rig(rig_geo=None, name=None):
         name=f"{name}_rig_no_transform"
     )
 
-    root_grp = asset.create_asset()
+    try:
+        from maya_frog_menu import asset
+        root_grp = asset.create_asset()
+    except ModuleNotFoundError:
+        root_grp = pm.group(empty=True, name=f"{name}_rig")
 
     pm.setAttr(f"{no_transform_grp}.visibility", 0)
-
-    pm.parent(ctl_grp, root_grp)
-    pm.parent(no_transform_grp, root_grp)
-    pm.parent(rig_geo, root_grp)
-
-    pm.addAttr(
-        main_ctl_dict['ctl'],
-        ln="hideCtlOnPlayback",
-        attributeType='bool',
-        defaultValue=True,
-        keyable=True
-    )
-
-    pm.connectAttr(f"{main_ctl_dict['ctl']}.hideCtlOnPlayback", f"{ctl_grp}.drawOverride.hideOnPlayback")
 
     for ctl in [local_0_ctl_dict["ctl"], local_1_ctl_dict["ctl"]]:
         for attr in ["scaleX", "scaleY", "scaleZ"]:
             pm.setAttr(f"{ctl}.{attr}", lock=1, k=0)
 
-    pm.setAttr(f"{rig_geo}.overrideEnabled", 1)
-    pm.setAttr(f"{rig_geo}.overrideDisplayType", 2)
+    geo_parent = rig_geo[0].fullPath().split("|")[1]
+
+    pm.parent(ctl_grp, root_grp)
+    pm.parent(no_transform_grp, root_grp)
+    pm.parent(geo_parent, root_grp)
+
+    add_anim_attributes(ctl_grp, main_ctl_dict['ctl'], geo_parent)
+
     pm.select(clear=True)
+
+
+def add_anim_attributes(ctl_grp, main_ctl, rig_parent):
+    pm.addAttr(
+        main_ctl,
+        ln="hideCtlOnPlayback",
+        attributeType='bool',
+        defaultValue=True,
+        keyable=True
+    )
+    pm.addAttr(
+        main_ctl,
+        ln="geoUnselectable",
+        attributeType='bool',
+        defaultValue=True,
+        keyable=True
+    )
+    pm.connectAttr(f"{main_ctl}.hideCtlOnPlayback", f"{ctl_grp}.drawOverride.hideOnPlayback")
+    pm.setAttr(f"{rig_parent}.overrideDisplayType", 2)
+    pm.connectAttr(f"{main_ctl}.geoUnselectable", f"{rig_parent}.overrideEnabled")
 
 
 def build_lattice(local_1_ctl_dict, main_ctl_dict, name, rig_geo, scale):
