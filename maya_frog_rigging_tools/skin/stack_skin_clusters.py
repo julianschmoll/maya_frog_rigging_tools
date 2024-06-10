@@ -7,15 +7,12 @@ from maya_frog_rigging_tools.skin.skin_utils import get_deform_shape, get_skin_c
 
 
 def log(msg, warn=False, error=False):
-	if warn and error:
-		raise ValueError('Please specify only one of warn / error.')
-
-	log_func = om2.MGlobal.displayInfo
-	if warn:
-		log_func = om2.MGlobal.displayWarning
-	elif error:
+	if error:
 		log_func = om2.MGlobal.displayError
-
+	elif warn:
+		log_func = om2.MGlobal.displayWarning
+	else:
+		log_func = om2.MGlobal.displayInfo
 	log_func(msg)
 
 
@@ -30,7 +27,7 @@ def move_skin(source, target):
 	weights, influence_count = source_mfn.getWeights(source_dp, components)
 
 	pm.select(cl=True)
-	target_skin = pm.deformer(target, type='skinCluster', n='MERGED__' + source_skin.name())[0]
+	target_skin = pm.deformer(target, type='skinCluster', n='stacked_' + source_skin.name())[0]
 
 	bind_inputs = [(x.inputs(plugs=True)[0] if x.isConnected() else None) for x in source_skin.bindPreMatrix]
 	bind_values = [x.get() for x in source_skin.bindPreMatrix]
@@ -58,14 +55,8 @@ def move_skin(source, target):
 
 def stack_skin_clusters():
 	items = pm.selected()
-
 	if len(items) == 2:
 		move_skin(items[0], items[1])
-
-		log(
-			'+ SkinMerge: Complete. Merged skin from {} onto {}.'
-			.format(*items)
-		)
-
+		log(f"Merged skin from {items[0]} onto {items[1]}.")
 	else:
 		log("Please select a skinned mesh and a target mesh.", error=True)
