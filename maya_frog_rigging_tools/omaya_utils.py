@@ -1,4 +1,6 @@
 import maya.OpenMaya as om
+from maya.api import OpenMaya as om2
+from maya.api import OpenMayaAnim as oma2
 import pymel.core as pm
 
 
