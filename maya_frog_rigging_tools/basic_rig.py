@@ -207,6 +207,12 @@ class BasicRig:
             "multiplyDivide",
             name=f"{self.name}_stretch_scale"
         )
+
+        sq_str_blend = pm.createNode(
+            "blendColors",
+            name=f"{self.name}_sqstr_blend"
+        )
+
         adjust_scale = pm.createNode(
             "multiplyDivide",
             name=f"{self.name}_adjust_scale"
@@ -217,9 +223,26 @@ class BasicRig:
         pm.connectAttr(f"{stretch_dist}.distance", f"{stretch_scale}.input2X")
         pm.connectAttr(f"{adjust_scale}.output", f"{stretch_scale}.input1")
 
-        pm.connectAttr(f"{stretch_scale}.outputX", f"{lattice_mid_ctl_data['srt']}.scaleX")
-        pm.connectAttr(f"{stretch_scale}.outputX", f"{lattice_mid_ctl_data['srt']}.scaleY")
-        pm.connectAttr(f"{stretch_scale}.outputX", f"{lattice_mid_ctl_data['srt']}.scaleZ")
+        pm.connectAttr(f"{stretch_scale}.outputX", f"{sq_str_blend}.color1R")
+        pm.connectAttr(f"{stretch_scale}.outputX", f"{sq_str_blend}.color1G")
+        pm.connectAttr(f"{stretch_scale}.outputX", f"{sq_str_blend}.color1B")
+
+        pm.setAttr(f"{sq_str_blend}.color2R", 1)
+        pm.setAttr(f"{sq_str_blend}.color2G", 1)
+        pm.setAttr(f"{sq_str_blend}.color2B", 1)
+
+        pm.connectAttr(f"{sq_str_blend}.output", f"{lattice_mid_ctl_data['srt']}.scale")
+
+        pm.addAttr(
+            self.ctl_data['main']['ctl'],
+            ln="sqStrFac",
+            attributeType='float',
+            defaultValue=1,
+            minValue=0,
+            maxValue=1,
+            keyable=True
+        )
+        pm.connectAttr(f"{self.ctl_data['main']['ctl']}.sqStrFac", f"{sq_str_blend}.blender")
 
         pm.scaleConstraint(
             self.ctl_data["main"]['ctl'],
