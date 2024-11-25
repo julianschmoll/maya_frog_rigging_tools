@@ -140,8 +140,13 @@ class BasicRig:
         match_transforms(mid_grp, lattice_mid_ctl_data["null"])
         match_transforms(low_grp, lattice_low_ctl_data["null"])
 
-        for ctl_dict, rig_grp in [(lattice_up_ctl_data, low_grp), (lattice_mid_ctl_data, mid_grp),
-                                  (lattice_low_ctl_data, up_grp)]:
+        constraint_list = [
+            (lattice_low_ctl_data, low_grp),
+            (lattice_mid_ctl_data, mid_grp),
+            (lattice_up_ctl_data, up_grp)
+        ]
+
+        for ctl_dict, rig_grp in constraint_list:
             ctl = ctl_dict["ctl"]
             pm.parentConstraint(
                 ctl,
